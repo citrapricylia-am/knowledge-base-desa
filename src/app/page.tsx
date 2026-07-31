@@ -1,65 +1,136 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Database, TrendingUp, ShieldCheck, ArrowRight } from 'lucide-react';
+import SearchDesa from '@/components/SearchDesa';
+import AnggaranInput from '@/components/AnggaranInput';
+import DataSourceBadge from '@/components/DataSourceBadge';
+import type { DesaSearchResult } from '@/lib/types';
 
 export default function Home() {
+  const router = useRouter();
+  const [selectedDesa, setSelectedDesa] = useState<DesaSearchResult | null>(null);
+  const [anggaran, setAnggaran] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!selectedDesa) {
+      setError('Pilih desa dari hasil pencarian.');
+      return;
+    }
+    if (anggaran <= 0) {
+      setError('Masukkan anggaran lebih dari 0.');
+      return;
+    }
+    setIsSubmitting(true);
+    router.push(
+      `/hasil?kode_bps=${selectedDesa.kode_bps}&anggaran=${anggaran}`,
+    );
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main className="min-h-[calc(100vh-3.5rem)] flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      <div className="w-full max-w-3xl z-10 animate-slide-up">
+        <div className="text-center mb-10 space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium">
+            <Database className="w-4 h-4" />
+            <span>Podes 2025 + IDM 2024</span>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-white">
+            Knowledge Base{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400 text-glow">
+              Potensi Desa
+            </span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-slate-400 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+            Penyaringan investasi sosial berbasis data resmi — pilih desa, masukkan
+            anggaran, dapatkan rekomendasi kegiatan yang deterministik dan narasi
+            yang dapat diaudit.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="flex flex-wrap justify-center gap-3 mb-10 text-slate-300 text-sm">
+          <div className="flex items-center gap-2 bg-slate-900/50 px-3 py-2 rounded-lg border border-slate-800/60">
+            <Database className="w-4 h-4 text-sky-400" />
+            <span className="font-medium">83.379 desa</span>
+          </div>
+          <div className="flex items-center gap-2 bg-slate-900/50 px-3 py-2 rounded-lg border border-slate-800/60">
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
+            <span className="font-medium">38 provinsi</span>
+          </div>
+          <div className="flex items-center gap-2 bg-slate-900/50 px-3 py-2 rounded-lg border border-slate-800/60">
+            <ShieldCheck className="w-4 h-4 text-amber-400" />
+            <span className="font-medium">Matriks + LLM format</span>
+          </div>
         </div>
-      </main>
-    </div>
+
+        <div className="glass-card rounded-2xl p-6 md:p-8">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-300 ml-1">
+                Pilih desa / kelurahan
+              </label>
+              <SearchDesa onSelect={setSelectedDesa} selected={selectedDesa} />
+              {selectedDesa && (
+                <p className="text-xs text-emerald-400/90 ml-1">
+                  Terpilih: {selectedDesa.nama_desa} · BPS {selectedDesa.kode_bps}
+                  {' · '}
+                  <Link
+                    href={`/desa/${selectedDesa.kode_bps}`}
+                    className="underline underline-offset-2 hover:text-emerald-300"
+                  >
+                    lihat profil
+                  </Link>
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-300 ml-1">
+                Rencana anggaran intervensi
+              </label>
+              <AnggaranInput value={anggaran} onChange={setAnggaran} />
+            </div>
+
+            {error && (
+              <p className="text-sm text-rose-300 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={!selectedDesa || anggaran <= 0 || isSubmitting}
+              className={`w-full py-4 rounded-xl font-bold text-base transition-all duration-300 flex items-center justify-center gap-2 ${
+                !selectedDesa || anggaran <= 0 || isSubmitting
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:shadow-[0_0_24px_rgba(16,185,129,0.35)] hover:scale-[1.01]'
+              }`}
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  Membuka analisis…
+                </>
+              ) : (
+                <>
+                  Analisis potensi
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+
+        <div className="mt-8 text-center">
+          <DataSourceBadge />
+        </div>
+      </div>
+    </main>
   );
 }
