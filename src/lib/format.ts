@@ -80,6 +80,7 @@ export function tierColor(tier?: string | null): string {
 export function labelIdm(score: number | null | undefined): StatusIdm | null {
   if (score === null || score === undefined || Number.isNaN(Number(score))) return null;
   const s = Number(score);
+  if (s === 0) return null; // IDM 0 = data belum tersedia, bukan Sangat Tertinggal
   if (s >= 0.8155) return 'MANDIRI';
   if (s >= 0.7072) return 'MAJU';
   if (s >= 0.5989) return 'BERKEMBANG';
@@ -95,6 +96,16 @@ const TANTANGAN_MAP: Record<string, string> = {
   limited_education_access: 'Akses pendidikan terbatas',
   minimal: 'Tantangan minimal',
 };
+
+const PODES2021_MAP: Record<string, string> = {
+  'Podes 2021': 'Termasuk Podes 2021',
+  'Bukan Podes 2021': 'Tidak termasuk Podes 2021',
+};
+
+export function translatePodes2021Status(val: string | null | undefined): string {
+  if (!val) return '—';
+  return PODES2021_MAP[val.trim()] ?? val.trim();
+}
 
 export function translateTantangan(val: string | null | undefined): string {
   if (!val) return '—';

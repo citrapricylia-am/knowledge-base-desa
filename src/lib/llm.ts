@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Desa, NarasiJson, Tier } from './types';
+import { translateTantangan } from './format';
 
 export const SYSTEM_PROMPT = `Kamu adalah analis pembangunan desa untuk sistem penyaringan investasi sosial berbasis data resmi Podes 2025 dan IDM 2024.
 
@@ -55,7 +56,7 @@ export function desaToLlmData(desa: Desa): DesaData {
     ada_faskes: Number(desa.ada_faskes ?? 0),
     ada_sd: Number(desa.ada_sd ?? 0),
     ada_smp: Number(desa.ada_smp ?? 0),
-    tantangan: desa.tantangan ?? null,
+    tantangan: translateTantangan(desa.tantangan),
     klasifikasi_podes: desa.klasifikasi_podes ?? null,
     estimasi_biaya: Number(desa.estimasi_biaya ?? 0),
   };

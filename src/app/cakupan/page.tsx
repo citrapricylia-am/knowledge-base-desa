@@ -88,17 +88,17 @@ export default function CakupanPage() {
             <Metric
               label="Dengan koordinat"
               value={formatNumber(stats.dengan_koordinat)}
-              sub="Koordinat Podes 2025"
+              sub="Memiliki data lokasi"
             />
             <Metric
               label="Dengan hutan alam"
               value={formatNumber(stats.dengan_hutan)}
-              sub="Luas hutan alam > 0"
+              sub="Ada hutan alam tersisa"
             />
             <Metric
               label="Dengan lahan kritis"
               value={formatNumber(stats.dengan_lahan_kritis)}
-              sub="Luas lahan kritis > 0"
+              sub="Ada lahan kritis teridentifikasi"
             />
           </div>
 

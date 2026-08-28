@@ -14,6 +14,7 @@ import {
   statusIdmColor,
   translateTantangan,
   translateRekomendasi,
+  translatePodes2021Status,
 } from '@/lib/format';
 
 export const runtime = 'nodejs';
@@ -96,7 +97,7 @@ export default async function DesaProfilPage({ params }: PageProps) {
             ) : null}
             {desa.podes2021_status && (
               <span className="px-2.5 py-1 rounded-md border text-xs bg-slate-500/15 text-slate-300 border-slate-500/30">
-                {desa.podes2021_status}
+                {translatePodes2021Status(desa.podes2021_status)}
               </span>
             )}
           </div>
