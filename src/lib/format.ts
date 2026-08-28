@@ -86,3 +86,37 @@ export function labelIdm(score: number | null | undefined): StatusIdm | null {
   if (s >= 0.4907) return 'TERTINGGAL';
   return 'SANGAT TERTINGGAL';
 }
+
+const TANTANGAN_MAP: Record<string, string> = {
+  water_stress: 'Kekurangan air bersih',
+  livelihood_dependency: 'Ketergantungan mata pencaharian',
+  subsistence_poverty: 'Kemiskinan subsisten',
+  limited_health_access: 'Akses kesehatan terbatas',
+  limited_education_access: 'Akses pendidikan terbatas',
+  minimal: 'Tantangan minimal',
+};
+
+export function translateTantangan(val: string | null | undefined): string {
+  if (!val) return '—';
+  return val
+    .split(',')
+    .map((v) => TANTANGAN_MAP[v.trim()] ?? v.trim())
+    .join(', ');
+}
+
+const REKOMENDASI_MAP: Record<string, string> = {
+  water_system: 'Sistem air bersih',
+  health_infrastructure: 'Infrastruktur kesehatan',
+  education_infrastructure: 'Infrastruktur pendidikan',
+  livelihood_diversification: 'Diversifikasi mata pencaharian',
+  community_governance: 'Tata kelola masyarakat',
+  monitoring: 'Monitoring dan pendampingan',
+};
+
+export function translateRekomendasi(val: string | null | undefined): string {
+  if (!val) return '—';
+  return val
+    .split(',')
+    .map((v) => REKOMENDASI_MAP[v.trim()] ?? v.trim())
+    .join(', ');
+}

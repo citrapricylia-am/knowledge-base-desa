@@ -43,8 +43,24 @@ export interface Desa {
   status_idm_computed?: StatusIdm | string | null;
   tantangan_arr?: string[] | null;
   rekomendasi_arr?: string[] | null;
+
+  // Podes 2025 data baru
+  luas_admin_ha?: number | null;
+  podes2025_prov_nama?: string | null;
+  podes2025_kab_nama?: string | null;
+  podes2025_kec_nama?: string | null;
+  podes2025_desa_nama?: string | null;
+  podes2025_lat?: number | null;
+  podes2025_lon?: number | null;
+  podes2021_status?: string | null;
+  hutan_alam_ha_2024?: number | null;
+  lahan_kritis_status?: string | null;
+  lahan_kritis_ha?: number | null;
+  podes2025_data_tersedia?: boolean | null;
+
   sumber_data?: string | null;
   disinkron_pada?: string | null;
+  updated_at?: string | null;
 }
 
 export type DesaSearchResult = Pick<
@@ -112,7 +128,18 @@ export interface CakupanStats {
   tanpa_podes: number;
   dengan_status_idm: number;
   tanpa_status_idm: number;
+  dengan_podes2025: number;
+  tanpa_podes2025: number;
+  dengan_koordinat: number;
+  dengan_hutan: number;
+  dengan_lahan_kritis: number;
   per_status_idm: { status: string; count: number }[];
   per_klasifikasi: { klasifikasi: string; count: number }[];
   per_provinsi_top: { nama_provinsi: string; count: number }[];
+}
+
+export interface ProvinsiSummary {
+  provinsi: string;
+  jumlah_desa: number;
+  jumlah_ha: number;
 }

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, MapPin, Trees, AlertTriangle } from 'lucide-react';
 import { queryOne } from '@/lib/db';
 import { toPublicDesa } from '@/lib/analisis';
 import ProfilIDM from '@/components/ProfilIDM';
@@ -12,6 +12,8 @@ import {
   formatRp,
   podesColor,
   statusIdmColor,
+  translateTantangan,
+  translateRekomendasi,
 } from '@/lib/format';
 
 export const runtime = 'nodejs';
@@ -52,6 +54,9 @@ export default async function DesaProfilPage({ params }: PageProps) {
 
   if (!desa) notFound();
 
+  const hasPodes = desa.podes2025_data_tersedia === true;
+  const skorIsZero = desa.skor_overall != null && Number(desa.skor_overall) === 0;
+
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 space-y-6 animate-slide-up">
       <Link
@@ -71,6 +76,12 @@ export default async function DesaProfilPage({ params }: PageProps) {
               {desa.nama_provinsi}
             </p>
             <p className="text-xs text-slate-500 mt-1">Kode BPS {desa.kode_bps}</p>
+            {hasPodes && desa.podes2025_desa_nama && (
+              <p className="text-xs text-slate-500 mt-0.5">
+                Podes 2025: {desa.podes2025_desa_nama}, {desa.podes2025_kec_nama},{' '}
+                {desa.podes2025_kab_nama}
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2 h-fit">
             {desa.status_idm_computed && (
@@ -83,6 +94,11 @@ export default async function DesaProfilPage({ params }: PageProps) {
                 Podes {desa.klasifikasi_podes}
               </span>
             ) : null}
+            {desa.podes2021_status && (
+              <span className="px-2.5 py-1 rounded-md border text-xs bg-slate-500/15 text-slate-300 border-slate-500/30">
+                {desa.podes2021_status}
+              </span>
+            )}
           </div>
         </div>
         {desa.alamat_lengkap && (
@@ -90,11 +106,26 @@ export default async function DesaProfilPage({ params }: PageProps) {
             {desa.alamat_lengkap}
           </p>
         )}
+        {hasPodes && desa.podes2025_lat != null && desa.podes2025_lon != null && (
+          <p className="text-sm text-slate-500 flex items-center gap-1.5 pt-1">
+            <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+            Koordinat: {Number(desa.podes2025_lat).toFixed(4)}, {Number(desa.podes2025_lon).toFixed(4)}
+          </p>
+        )}
       </header>
 
-      {!desa.klasifikasi_podes && (
+      {!hasPodes && (
         <div className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
-          Data skor Podes tidak tersedia untuk desa ini. Profil IDM 2024 tersedia.
+          Data Podes 2025 tidak tersedia untuk desa ini. Profil IDM 2024 tetap
+          ditampilkan, namun rekomendasi kegiatan tidak dapat dihasilkan tanpa
+          data Podes.
+        </div>
+      )}
+
+      {hasPodes && skorIsZero && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          Skor Podes 0 — desa ini tercakup Podes 2025 namun belum memiliki skor
+          komponen lengkap. Estimasi kebutuhan ideal tidak dapat dihitung.
         </div>
       )}
 
@@ -107,14 +138,22 @@ export default async function DesaProfilPage({ params }: PageProps) {
       />
 
       <section className="grid md:grid-cols-2 gap-4">
-        <StatBlock title="Demografi & wilayah">
+        <StatBlock title="Demografi & Wilayah">
           <Row label="Jumlah jiwa" value={formatNumber(desa.jumlah_jiwa)} />
           <Row label="Rumah tangga" value={formatNumber(desa.jumlah_rt)} />
           <Row
-            label="Luas"
+            label="Luas wilayah"
             value={
               desa.luas_hektar != null
                 ? `${formatNumber(Number(desa.luas_hektar), 2)} ha`
+                : '—'
+            }
+          />
+          <Row
+            label="Luas administrasi"
+            value={
+              desa.luas_admin_ha != null
+                ? `${formatNumber(Number(desa.luas_admin_ha), 2)} ha`
                 : '—'
             }
           />
@@ -127,7 +166,7 @@ export default async function DesaProfilPage({ params }: PageProps) {
         </StatBlock>
 
         <StatBlock title="Indikator Podes">
-          <Row label="Skor overall" value={formatNumber(desa.skor_overall != null ? Number(desa.skor_overall) : null, 1)} />
+          <Row label="Skor overall" value={skorIsZero ? '0 (belum lengkap)' : formatNumber(desa.skor_overall != null ? Number(desa.skor_overall) : null, 1)} />
           <Row label="% air bersih" value={formatPct(desa.pct_air_bersih != null ? Number(desa.pct_air_bersih) : null)} />
           <Row label="% pertanian" value={formatPct(desa.pct_pertanian != null ? Number(desa.pct_pertanian) : null)} />
           <Row label="% SMP+" value={formatPct(desa.pct_smp_plus != null ? Number(desa.pct_smp_plus) : null)} />
@@ -139,10 +178,37 @@ export default async function DesaProfilPage({ params }: PageProps) {
             label="Estimasi biaya ideal"
             value={formatRp(desa.estimasi_biaya != null ? Number(desa.estimasi_biaya) : 0)}
           />
-          <Row label="Tantangan" value={desa.tantangan ?? '—'} />
-          <Row label="Rekomendasi (raw)" value={desa.rekomendasi ?? '—'} />
+          <Row label="Tantangan" value={translateTantangan(desa.tantangan)} />
+          <Row label="Rekomendasi" value={translateRekomendasi(desa.rekomendasi)} />
         </StatBlock>
       </section>
+
+      {hasPodes && (desa.hutan_alam_ha_2024 != null || desa.lahan_kritis_ha != null) && (
+        <section className="grid md:grid-cols-2 gap-4">
+          <StatBlock title="Hutan & Lahan Kritis">
+            <Row
+              label="Hutan alam tersisa (2024)"
+              value={
+                desa.hutan_alam_ha_2024 != null
+                  ? `${formatNumber(Number(desa.hutan_alam_ha_2024), 2)} ha`
+                  : '—'
+              }
+            />
+            <Row
+              label="Status lahan kritis"
+              value={desa.lahan_kritis_status ?? '—'}
+            />
+            <Row
+              label="Luas lahan kritis"
+              value={
+                desa.lahan_kritis_ha != null
+                  ? `${formatNumber(Number(desa.lahan_kritis_ha), 2)} ha`
+                  : '—'
+              }
+            />
+          </StatBlock>
+        </section>
+      )}
 
       <div className="flex flex-wrap gap-3">
         <Link
@@ -159,7 +225,7 @@ export default async function DesaProfilPage({ params }: PageProps) {
         </Link>
       </div>
 
-      <DataSourceBadge className="pt-4" />
+      <DataSourceBadge className="pt-4" podes2025Tersedia={desa.podes2025_data_tersedia} />
     </main>
   );
 }

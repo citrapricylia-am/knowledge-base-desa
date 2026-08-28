@@ -151,7 +151,7 @@ function HasilContent() {
               </span>
             ) : (
               <span className="px-2.5 py-1 rounded-md border text-xs font-medium bg-slate-500/15 text-slate-300 border-slate-500/30">
-                Podes n/a
+                Podes tidak tersedia
               </span>
             )}
             <span
@@ -165,9 +165,17 @@ function HasilContent() {
 
       {!analisis.podes_tersedia && (
         <div className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
-          Data skor Podes tidak tersedia untuk desa ini. Profil IDM 2024
+          Data Podes 2025 tidak tersedia untuk desa ini. Profil IDM 2024
           tersedia dan ditampilkan di bawah. Rekomendasi kegiatan tidak dapat
           dihasilkan tanpa data Podes.
+        </div>
+      )}
+
+      {analisis.podes_tersedia && analisis.estimasi_biaya_ideal === 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          Skor Podes 0 — desa ini tercakup Podes 2025 namun belum memiliki skor
+          komponen lengkap. Estimasi kebutuhan ideal tidak dapat dihitung, sehingga
+          coverage anggaran menunjukkan 0%.
         </div>
       )}
 
@@ -185,8 +193,8 @@ function HasilContent() {
         />
         <InfoChip
           icon={<Map className="w-4 h-4 text-emerald-400" />}
-          label="Luas (ha)"
-          value={formatNumber(desa.luas_hektar != null ? Number(desa.luas_hektar) : null, 1)}
+          label="Luas admin (ha)"
+          value={formatNumber(desa.luas_admin_ha != null ? Number(desa.luas_admin_ha) : null, 1)}
         />
         <InfoChip
           icon={<Hospital className="w-4 h-4 text-rose-400" />}
@@ -251,7 +259,7 @@ function HasilContent() {
 
       {/* 7. Disclaimer */}
       <footer className="pt-2 pb-8 space-y-1">
-        <DataSourceBadge />
+        <DataSourceBadge podes2025Tersedia={desa.podes2025_data_tersedia} />
         <p className="text-xs text-slate-600">
           Tahun data: {analisis.tahun_data} · Sumber narasi: {analisis.sumber_narasi}
         </p>

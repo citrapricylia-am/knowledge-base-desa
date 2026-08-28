@@ -12,13 +12,23 @@ export async function GET() {
       tanpa_podes: string;
       dengan_status_idm: string;
       tanpa_status_idm: string;
+      dengan_podes2025: string;
+      tanpa_podes2025: string;
+      dengan_koordinat: string;
+      dengan_hutan: string;
+      dengan_lahan_kritis: string;
     }>(`
       SELECT
         COUNT(*)::text AS total_desa,
         COUNT(*) FILTER (WHERE klasifikasi_podes IS NOT NULL)::text AS dengan_podes,
         COUNT(*) FILTER (WHERE klasifikasi_podes IS NULL)::text AS tanpa_podes,
         COUNT(*) FILTER (WHERE status_idm_computed IS NOT NULL)::text AS dengan_status_idm,
-        COUNT(*) FILTER (WHERE status_idm_computed IS NULL)::text AS tanpa_status_idm
+        COUNT(*) FILTER (WHERE status_idm_computed IS NULL)::text AS tanpa_status_idm,
+        COUNT(*) FILTER (WHERE podes2025_data_tersedia = true)::text AS dengan_podes2025,
+        COUNT(*) FILTER (WHERE podes2025_data_tersedia = false)::text AS tanpa_podes2025,
+        COUNT(*) FILTER (WHERE podes2025_lat IS NOT NULL)::text AS dengan_koordinat,
+        COUNT(*) FILTER (WHERE hutan_alam_ha_2024 > 0)::text AS dengan_hutan,
+        COUNT(*) FILTER (WHERE lahan_kritis_ha > 0)::text AS dengan_lahan_kritis
       FROM desa
     `);
 
@@ -50,6 +60,11 @@ export async function GET() {
       tanpa_podes: Number(totals?.tanpa_podes ?? 0),
       dengan_status_idm: Number(totals?.dengan_status_idm ?? 0),
       tanpa_status_idm: Number(totals?.tanpa_status_idm ?? 0),
+      dengan_podes2025: Number(totals?.dengan_podes2025 ?? 0),
+      tanpa_podes2025: Number(totals?.tanpa_podes2025 ?? 0),
+      dengan_koordinat: Number(totals?.dengan_koordinat ?? 0),
+      dengan_hutan: Number(totals?.dengan_hutan ?? 0),
+      dengan_lahan_kritis: Number(totals?.dengan_lahan_kritis ?? 0),
       per_status_idm: perStatus.map((r) => ({
         status: r.status,
         count: Number(r.count),

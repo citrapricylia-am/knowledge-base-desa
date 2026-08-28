@@ -50,9 +50,24 @@ CREATE TABLE IF NOT EXISTS desa (
   tantangan_arr       TEXT[],
   rekomendasi_arr     TEXT[],
 
+  -- Podes 2025 data baru (dari Desa25_Podes2125_Idm24_Ha24_Lkrit22.xlsx)
+  luas_admin_ha        NUMERIC(12,4),       -- dari "Adm Desa (Ha)"
+  podes2025_prov_nama TEXT,                -- dari R101N; NULL = desa tidak tercakup Podes 2025
+  podes2025_kab_nama   TEXT,                -- dari R102N
+  podes2025_kec_nama   TEXT,                -- dari R103N
+  podes2025_desa_nama  TEXT,                -- dari R104N
+  podes2025_lat        NUMERIC(10,7),       -- dari R307B1_LAT; (0,0) → NULL; range 0-11 (data tidak pakai tanda negatif)
+  podes2025_lon        NUMERIC(10,7),       -- dari R307B1_LON; (0,0) → NULL; range 95-141
+  podes2021_status     TEXT,                -- dari "(03) DATA PODES 2021"; nilai teks apa adanya
+  hutan_alam_ha_2024   NUMERIC(12,4),       -- dari "Luas hutan alam" (BUKAN Ha24 — itu label konstan)
+  lahan_kritis_status  TEXT,                -- dari "(06) Lahan Kritis"; nilai teks apa adanya
+  lahan_kritis_ha      NUMERIC(12,4),       -- dari "Luas Lahan Kritis" (BUKAN Kritis00 — itu label konstan)
+  podes2025_data_tersedia BOOLEAN DEFAULT false, -- true jika podes2025_prov_nama IS NOT NULL
+
   -- Metadata
   sumber_data         TEXT          DEFAULT 'Podes2025+IDM2024',
-  disinkron_pada      TIMESTAMPTZ   DEFAULT now()
+  disinkron_pada      TIMESTAMPTZ   DEFAULT now(),
+  updated_at          TIMESTAMPTZ   DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_desa_provinsi    ON desa (nama_provinsi);
@@ -107,3 +122,13 @@ CREATE TABLE IF NOT EXISTS kegiatan_config (
 );
 
 CREATE INDEX IF NOT EXISTS idx_kegiatan_key_tier ON kegiatan_config (rekomendasi_key, tier);
+
+-- ================================================================
+-- TABEL RINGKASAN PROVINSI (dari 00Desa25Podes25Idm24_Res.xlsx)
+-- ================================================================
+CREATE TABLE IF NOT EXISTS desa_summary_provinsi (
+  provinsi      TEXT        PRIMARY KEY,
+  jumlah_desa   INTEGER     NOT NULL,
+  jumlah_ha     NUMERIC     NOT NULL,
+  updated_at    TIMESTAMPTZ DEFAULT now()
+);
