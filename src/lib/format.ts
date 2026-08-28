@@ -80,7 +80,6 @@ export function tierColor(tier?: string | null): string {
 export function labelIdm(score: number | null | undefined): StatusIdm | null {
   if (score === null || score === undefined || Number.isNaN(Number(score))) return null;
   const s = Number(score);
-  if (s === 0) return null; // IDM 0 = data belum tersedia, bukan Sangat Tertinggal
   if (s >= 0.8155) return 'MANDIRI';
   if (s >= 0.7072) return 'MAJU';
   if (s >= 0.5989) return 'BERKEMBANG';

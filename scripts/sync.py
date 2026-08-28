@@ -87,8 +87,6 @@ VALID_ESTIMASI = {0, 1_500_000_000, 3_000_000_000, 4_500_000_000}
 def label_idm(score: float):
     if pd.isna(score):
         return None
-    if score == 0:
-        return None  # IDM 0 = data belum tersedia, bukan Sangat Tertinggal
     if score >= 0.8155:
         return "MANDIRI"
     if score >= 0.7072:

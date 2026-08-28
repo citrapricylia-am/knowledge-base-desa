@@ -67,16 +67,10 @@ export default function CakupanPage() {
             <Metric
               label="Dengan Podes 2025"
               value={formatNumber(stats.dengan_podes2025)}
-              sub={
-                stats.total_desa
-                  ? formatPct((stats.dengan_podes2025 / stats.total_desa) * 100)
-                  : undefined
-              }
             />
             <Metric
               label="Tanpa Podes 2025"
               value={formatNumber(stats.tanpa_podes2025)}
-              sub="IDM tetap ditampilkan"
             />
             <Metric
               label="Status IDM"
@@ -88,17 +82,14 @@ export default function CakupanPage() {
             <Metric
               label="Dengan koordinat"
               value={formatNumber(stats.dengan_koordinat)}
-              sub="Memiliki data lokasi"
             />
             <Metric
               label="Dengan hutan alam"
               value={formatNumber(stats.dengan_hutan)}
-              sub="Ada hutan alam tersisa"
             />
             <Metric
               label="Dengan lahan kritis"
               value={formatNumber(stats.dengan_lahan_kritis)}
-              sub="Ada lahan kritis teridentifikasi"
             />
           </div>
 
