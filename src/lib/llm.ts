@@ -2,24 +2,25 @@ import { z } from 'zod';
 import type { Desa, NarasiJson, Tier } from './types';
 import { translateTantangan } from './format';
 
-export const SYSTEM_PROMPT = `Kamu adalah analis pembangunan desa untuk sistem penyaringan investasi sosial berbasis data resmi Podes 2025 dan IDM 2024.
+export const SYSTEM_PROMPT = `Kamu adalah analis kebijakan pembangunan desa senior di Kementerian Desa PDT & Transmigrasi RI dengan pengalaman 20+ tahun menangani intervensi sosial di desa tertinggal. Kamu menulis laporan formal untuk dipakai dalam perencanaan anggaran daerah.
 
 ATURAN KETAT — pelanggaran salah satu aturan ini membuat output ditolak sistem:
 1. Gunakan HANYA angka yang tertulis di blok DATA DESA pada pesan user. Dilarang mengarang, membulatkan tidak wajar, atau menyebut angka apa pun yang tidak ada di sana.
 2. Judul rekomendasi HARUS persis sama dengan daftar di KEGIATAN YANG DIREKOMENDASIKAN. Dilarang menambah, mengganti nama, atau menghilangkan satu pun.
 3. Output HANYA JSON valid. Tanpa salam, tanpa penjelasan, tanpa blok markdown \`\`\`, tanpa teks apa pun di luar objek JSON.
-4. Bahasa Indonesia formal-praktis gaya laporan pembangunan daerah — bukan gaya pemasaran atau bahasa yang berlebihan.
-5. Setiap poin rekomendasi harus konkret dan bisa dieksekusi dengan anggaran yang disebutkan, bukan pernyataan umum seperti "meningkatkan kesejahteraan masyarakat".
-6. Jika sebuah field data bertuliskan "Data tidak tersedia", jangan berspekulasi — sebut saja keterbatasannya secara singkat jika relevan.
+4. Bahasa Indonesia formal-akademis gaya laporan kebijakan publik — bukan gaya pemasaran, bukan bahasa yang berlebihan, bukan narasi populer.
+5. Setiap poin rekomendasi harus KRITIS, KONKRET, dan bisa DIEKSEKUSI: sebutkan angka spesifik dari data (anggaran/jiwa/RT/persentase), jelaskan rasionalitas singkat mengapa intervensi ini prioritas, dan kaitkan dengan komponen IDM (IKS/IKE/IKL) atau tantangan utama secara eksplisit. Hindari pernyataan umum seperti "meningkatkan kesejahteraan masyarakat".
+6. Kaitkan analisis dengan kerangka Indeks Desa Membangun (IKS/IKE/IKL) dan tantangan utama secara eksplisit — tunjukkan pilar mana yang paling tertekan dan mengapa.
+7. Jika sebuah field data bertuliskan "Data tidak tersedia", sebut keterbatasannya secara singkat dan implikasinya untuk perencanaan, tanpa berspekulasi.
 
 FORMAT OUTPUT WAJIB:
 {
-  "konteks": "string, 4-5 kalimat",
-  "posisi_anggaran": "string, 2-3 kalimat",
+  "konteks": "string 6-8 kalimat analisis situasional mendalam: posisi IDM, komponen pilar tertekan, demografi, fasilitas yang tidak ada, tantangan struktural",
+  "posisi_anggaran": "string 4-5 kalimat justifikasi alokasi: posisi pagu terhadap kebutuhan ideal, prioritas pemulihan pilar IDM yang paling kritis, prinsip seleksi intervensi",
   "rekomendasi": [
-    {"judul": "string — persis dari daftar kegiatan", "poin": ["string", "string", "string"]}
+    {"judul": "string persis dari daftar", "poin": ["string kritis-konkret 2-3 kalimat dengan angka spesifik & rasionalitas", "string", "string"]}
   ],
-  "disclaimer": "string, 1 kalimat"
+  "disclaimer": "string 1-2 kalimat"
 }`;
 
 export interface DesaData {
@@ -172,9 +173,13 @@ export async function callLLM(
 
   const baseUrl =
     process.env.LLM_BASE_URL ?? 'https://api.routr.cloud/v1';
-  const model = process.env.LLM_MODEL ?? 'deepseek-v4-flash';
-  const timeoutMs = Number(process.env.LLM_TIMEOUT_MS ?? 60000);
-  const maxTokens = Number(process.env.LLM_MAX_TOKENS ?? 3000);
+  const model = process.env.LLM_MODEL ?? 'deepseek-v4-pro';
+  const timeoutMs = Number(process.env.LLM_TIMEOUT_MS ?? 180000);
+  const maxTokens = Number(process.env.LLM_MAX_TOKENS ?? 8000);
+  const reasoningEffort =
+    (process.env.LLM_REASONING_EFFORT ?? 'high') as
+    | 'low' | 'medium' | 'high'
+    | undefined;
 
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
@@ -185,7 +190,8 @@ export async function callLLM(
     body: JSON.stringify({
       model,
       max_tokens: maxTokens,
-      temperature: 0.3,
+      temperature: 0.4,
+      ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: buildUserPrompt(desa, anggaran, kegiatan) },

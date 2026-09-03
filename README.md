@@ -8,7 +8,7 @@ Spesifikasi: `PRODUCTION-DEV-GUIDE` v1.1.
 
 - Next.js 16 (App Router) + TypeScript + Tailwind CSS 4
 - PostgreSQL (`pg`)
-- LLM OpenAI-compatible (opsional, formatting narasi; default: deepseek-v4-flash via api.routr.cloud) + template fallback
+- LLM OpenAI-compatible (opsional, formatting narasi; default: deepseek-v4-pro via api.routr.cloud, reasoning_effort=high) + template fallback
 - Python sync script (`pandas` + `psycopg2`)
 
 ## Setup cepat
