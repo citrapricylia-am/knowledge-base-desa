@@ -8,7 +8,7 @@ Spesifikasi: `PRODUCTION-DEV-GUIDE` v1.1.
 
 - Next.js 16 (App Router) + TypeScript + Tailwind CSS 4
 - PostgreSQL (`pg`)
-- Anthropic Claude Haiku (opsional, formatting narasi) + template fallback
+- LLM OpenAI-compatible (opsional, formatting narasi; default: deepseek-v4-flash via api.routr.cloud) + template fallback
 - Python sync script (`pandas` + `psycopg2`)
 
 ## Setup cepat
@@ -25,7 +25,7 @@ pip install pandas openpyxl psycopg2-binary
 
 ```bash
 cp .env.example .env.local
-# isi DATABASE_URL, (opsional) ANTHROPIC_API_KEY
+# isi DATABASE_URL, (opsional) LLM_API_KEY / LLM_BASE_URL / LLM_MODEL
 ```
 
 ### 3. Database
@@ -103,4 +103,4 @@ src/
 - [ ] DB terisi ~83k baris
 - [ ] Search `Belatung Embaloh` return 1 hasil
 - [ ] Analisis kode `5611012004`, anggaran 100000000 → narasi + tier SMALL
-- [ ] Tanpa `ANTHROPIC_API_KEY` → fallback template tetap jalan
+- [ ] Tanpa `LLM_API_KEY` → fallback template tetap jalan

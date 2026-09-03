@@ -165,25 +165,29 @@ export async function callLLM(
   anggaran: number,
   kegiatan: string[],
 ): Promise<NarasiJson> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.LLM_API_KEY;
   if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY tidak diset');
+    throw new Error('LLM_API_KEY tidak diset');
   }
 
-  const timeoutMs = Number(process.env.LLM_TIMEOUT_MS ?? 6000);
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const baseUrl =
+    process.env.LLM_BASE_URL ?? 'https://api.routr.cloud/v1';
+  const model = process.env.LLM_MODEL ?? 'deepseek-v4-flash';
+  const timeoutMs = Number(process.env.LLM_TIMEOUT_MS ?? 60000);
+  const maxTokens = Number(process.env.LLM_MAX_TOKENS ?? 3000);
+
+  const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
+      authorization: `Bearer ${apiKey}`,
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001',
-      max_tokens: 1200,
+      model,
+      max_tokens: maxTokens,
       temperature: 0.3,
-      system: SYSTEM_PROMPT,
       messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: buildUserPrompt(desa, anggaran, kegiatan) },
         { role: 'assistant', content: '{' },
       ],
@@ -197,10 +201,15 @@ export async function callLLM(
   }
 
   const data = (await response.json()) as {
-    content?: { type: string; text?: string }[];
+    choices?: { message?: { content?: string } }[];
   };
-  const text = data.content?.find((c) => c.type === 'text')?.text ?? '';
-  const raw = '{' + text;
+  const text = data.choices?.[0]?.message?.content ?? '';
+
+  // Prefill '{' dikirim sebagai assistant message; model melanjutkan isinya.
+  // Beberapa model menutup JSON dengan '}' final, beberapa mengulang '{' awal.
+  // Ambil dari '{' pertama hingga '}' terakhir yang menyeimbangkan.
+  const start = text.indexOf('{');
+  const raw = start === -1 ? `{${text}` : text.slice(start);
   const parsed = JSON.parse(raw);
   return NarasiSchema.parse(parsed);
 }
