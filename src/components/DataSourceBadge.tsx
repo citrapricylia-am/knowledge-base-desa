@@ -11,7 +11,7 @@ export default function DataSourceBadge({
   const noPodes = podes2025Tersedia === false;
 
   return (
-    <p className={`text-xs text-slate-500 leading-relaxed ${className}`}>
+    <p className={`text-xs text-white/25 leading-relaxed ${className}`}>
       {hasPodes ? (
         <>Sumber: Podes 2025 · IDM 2024 · BPS Indonesia</>
       ) : noPodes ? (

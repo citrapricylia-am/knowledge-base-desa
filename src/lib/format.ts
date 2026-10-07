@@ -31,49 +31,81 @@ export function desaFullName(parts: {
 export function statusIdmColor(status?: string | null): string {
   switch ((status ?? '').toUpperCase()) {
     case 'MANDIRI':
-      return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+      return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
     case 'MAJU':
-      return 'bg-sky-500/15 text-sky-300 border-sky-500/30';
+      return 'bg-sky-500/10 text-sky-400 border-sky-500/20';
     case 'BERKEMBANG':
-      return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+      return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
     case 'TERTINGGAL':
-      return 'bg-orange-500/15 text-orange-300 border-orange-500/30';
+      return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
     case 'SANGAT TERTINGGAL':
-      return 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+      return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
     default:
-      return 'bg-slate-500/15 text-slate-300 border-slate-500/30';
+      return 'bg-white/5 text-white/50 border-white/10';
   }
 }
 
 export function podesColor(klasifikasi?: KlasifikasiPodes | string | null): string {
   switch ((klasifikasi ?? '').toUpperCase()) {
     case 'HIGH':
-      return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+      return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
     case 'MODERATE':
-      return 'bg-sky-500/15 text-sky-300 border-sky-500/30';
+      return 'bg-sky-500/10 text-sky-400 border-sky-500/20';
     case 'LOW':
-      return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+      return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
     case 'CRITICAL':
-      return 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+      return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
     default:
-      return 'bg-slate-500/15 text-slate-300 border-slate-500/30';
+      return 'bg-white/5 text-white/50 border-white/10';
+  }
+}
+
+export function podesLabel(klasifikasi?: KlasifikasiPodes | string | null): string {
+  switch ((klasifikasi ?? '').toUpperCase()) {
+    case 'HIGH': return 'Potensi tinggi';
+    case 'MODERATE': return 'Potensi sedang';
+    case 'LOW': return 'Potensi rendah';
+    case 'CRITICAL': return 'Potensi sangat rendah';
+    default: return klasifikasi ?? '—';
+  }
+}
+
+export function tierLabel(tier?: string | null): string {
+  switch (tier) {
+    case 'FULL': return 'Anggaran memenuhi kebutuhan';
+    case 'MAJOR': return 'Anggaran memenuhi sebagian besar';
+    case 'MEDIUM': return 'Anggaran terbatas';
+    case 'SMALL': return 'Anggaran minim';
+    case 'MICRO': return 'Anggaran sangat minim';
+    default: return tier ?? '—';
+  }
+}
+
+export function tierDesc(tier?: string | null): string {
+  switch (tier) {
+    case 'FULL': return 'Anggaran Anda lebih dari cukup untuk seluruh kebutuhan ideal desa. Bisa melaksanakan intervensi menyeluruh tanpa pengurangan.';
+    case 'MAJOR': return 'Anggaran Anda cukup untuk sebagian besar kebutuhan. Masih bisa bangun infrastruktur fisik, tapi perlu pilih yang paling mendesak.';
+    case 'MEDIUM': return 'Anggaran Anda tidak cukup untuk bangun infrastruktur fisik. Lebih efektif dipakai untuk kegiatan penunjang — pelatihan, penguatan layanan, dan pendampingan.';
+    case 'SMALL': return 'Anggaran Anda sangat terbatas dibanding kebutuhan desa. Fokuskan pada pelatihan dan penguatan kapasitas warga, bukan pembangunan fisik.';
+    case 'MICRO': return 'Anggaran Anda jauh di bawah kebutuhan desa. Hanya cukup untuk edukasi, sosialisasi, dan penjangkauan langsung ke warga.';
+    default: return '';
   }
 }
 
 export function tierColor(tier?: string | null): string {
   switch (tier) {
     case 'FULL':
-      return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+      return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
     case 'MAJOR':
-      return 'bg-teal-500/15 text-teal-300 border-teal-500/30';
+      return 'bg-teal-500/10 text-teal-400 border-teal-500/20';
     case 'MEDIUM':
-      return 'bg-sky-500/15 text-sky-300 border-sky-500/30';
+      return 'bg-sky-500/10 text-sky-400 border-sky-500/20';
     case 'SMALL':
-      return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+      return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
     case 'MICRO':
-      return 'bg-slate-500/15 text-slate-300 border-slate-500/30';
+      return 'bg-white/5 text-white/50 border-white/10';
     default:
-      return 'bg-slate-500/15 text-slate-300 border-slate-500/30';
+      return 'bg-white/5 text-white/50 border-white/10';
   }
 }
 

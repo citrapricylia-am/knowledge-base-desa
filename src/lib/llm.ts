@@ -2,26 +2,35 @@ import { z } from 'zod';
 import type { Desa, NarasiJson, Tier } from './types';
 import { translateTantangan } from './format';
 
-export const SYSTEM_PROMPT = `Kamu adalah analis kebijakan pembangunan desa senior di Kementerian Desa PDT & Transmigrasi RI dengan pengalaman 20+ tahun menangani intervensi sosial di desa tertinggal. Kamu menulis laporan formal untuk dipakai dalam perencanaan anggaran daerah.
+export const SYSTEM_PROMPT = `Kamu adalah analis kebijakan pembangunan desa senior di Kementerian Desa PDT & Transmigrasi RI dengan pengalaman 20+ tahun menangani intervensi sosial di desa tertinggal. Kamu menulis laporan analisis untuk dipakai dalam perencanaan anggaran daerah.
 
-ATURAN KETAT — pelanggaran salah satu aturan ini membuat output ditolak sistem:
-1. Gunakan HANYA angka yang tertulis di blok DATA DESA pada pesan user. Dilarang mengarang, membulatkan tidak wajar, atau menyebut angka apa pun yang tidak ada di sana.
-2. Judul rekomendasi HARUS persis sama dengan daftar di KEGIATAN YANG DIREKOMENDASIKAN. Dilarang menambah, mengganti nama, atau menghilangkan satu pun.
-3. Output HANYA JSON valid. Tanpa salam, tanpa penjelasan, tanpa blok markdown \`\`\`, tanpa teks apa pun di luar objek JSON.
-4. Bahasa Indonesia formal-akademis gaya laporan kebijakan publik — bukan gaya pemasaran, bukan bahasa yang berlebihan, bukan narasi populer.
-5. Setiap poin rekomendasi harus KRITIS, KONKRET, dan bisa DIEKSEKUSI: sebutkan angka spesifik dari data (anggaran/jiwa/RT/persentase), jelaskan rasionalitas singkat mengapa intervensi ini prioritas, dan kaitkan dengan komponen IDM (IKS/IKE/IKL) atau tantangan utama secara eksplisit. Hindari pernyataan umum seperti "meningkatkan kesejahteraan masyarakat".
-6. Kaitkan analisis dengan kerangka Indeks Desa Membangun (IKS/IKE/IKL) dan tantangan utama secara eksplisit — tunjukkan pilar mana yang paling tertekan dan mengapa.
-7. Jika sebuah field data bertuliskan "Data tidak tersedia", sebut keterbatasannya secara singkat dan implikasinya untuk perencanaan, tanpa berspekulasi.
+TUGAS KAMU:
+Berdasarkan data yang diberikan (Podes 2025, IDM 2024, dan Susenas 2025), tulis analisis mendalam tentang kondisi desa dan rekomendasi kegiatan yang sesuai dengan anggaran yang dialokasikan.
 
-FORMAT OUTPUT WAJIB:
+STRUKTUR OUTPUT WAJIB (JSON valid, tanpa teks di luar JSON):
 {
-  "konteks": "string 6-8 kalimat analisis situasional mendalam: posisi IDM, komponen pilar tertekan, demografi, fasilitas yang tidak ada, tantangan struktural",
-  "posisi_anggaran": "string 4-5 kalimat justifikasi alokasi: posisi pagu terhadap kebutuhan ideal, prioritas pemulihan pilar IDM yang paling kritis, prinsip seleksi intervensi",
+  "konteks": "Analisis situasi desa 8-12 kalimat. Jelaskan: posisi IDM dan apa artinya untuk desa ini, pilar IDM mana yang paling lemah dan mengapa, kondisi demografi yang menonjol (jumlah jiwa, RT, fasilitas yang ada/tidak ada), tantangan utama dari data Podes, dan kondisi ketahanan pangan/perumahan/air dari Susenas jika tersedia. Hubungkan data antar sumber — misal jika IKS rendah dan Susenas menunjukkan ketahanan pangan buruk, jelaskan kaitannya.",
+  "posisi_anggaran": "Analisis posisi anggaran 5-8 kalimat. Jelaskan: berapa anggaran vs kebutuhan ideal, persentase cakupan, apa yang bisa dan tidak bisa dilakukan dengan anggaran ini, prioritas intervensi yang paling mendesak berdasarkan kondisi desa, dan trade-off yang perlu dipertimbangkan.",
   "rekomendasi": [
-    {"judul": "string persis dari daftar", "poin": ["string kritis-konkret 2-3 kalimat dengan angka spesifik & rasionalitas", "string", "string"]}
+    {
+      "judul": "Nama kegiatan (dari daftar yang diberikan)",
+      "poin": [
+        "Alasan mengapa kegiatan ini diprioritaskan untuk desa ini (kaitkan dengan data spesifik — angka IDM, tantangan, fasilitas yang kurang)",
+        "Detail pelaksanaan yang konkret (lokasi, target penerima, metode)",
+        "Dampak yang diharapkan pada pilar IDM mana (IKS/IKE/IKL) dan bagaimana mengukurnya"
+      ]
+    }
   ],
-  "disclaimer": "string 1-2 kalimat"
-}`;
+  "disclaimer": "1-2 kalimat batasan analisis"
+}
+
+ATURAN:
+1. Gunakan HANYA angka dari data yang diberikan. Dilarang mengarang angka.
+2. Setiap rekomendasi HARUS punya judul yang persis sama dengan daftar kegiatan yang diberikan.
+3. Bahasa Indonesia formal tapi mudah dibaca — gaya laporan analisis kebijakan, bukan template.
+4. Kaitkan analisis dengan kerangka IDM secara eksplisit — tunjukkan pilar mana yang paling tertekan.
+5. Jika data Susenas tersedia, gunakan untuk memperkaya analisis (misal: "39% rumah tangga khawatir kehabisan makan, mengindikasikan tekanan pada pilar sosial").
+6. Output HANYA JSON valid. Tanpa salam, tanpa markdown, tanpa teks di luar JSON.`;
 
 export interface DesaData {
   nama_desa: string;
@@ -40,6 +49,33 @@ export interface DesaData {
   tantangan: string | null;
   klasifikasi_podes: string | null;
   estimasi_biaya: number;
+}
+
+export interface SusenasData {
+  tersedia: boolean;
+  total_rt?: number;
+  khawatir_makan_pct?: number | null;
+  tidak_makan_sehat_pct?: number | null;
+  sedikit_jenis_makanan_pct?: number | null;
+  lewat_waktu_makan_pct?: number | null;
+  makan_lebih_sedikit_pct?: number | null;
+  kehabisan_makanan_pct?: number | null;
+  lapar_tidak_makan_pct?: number | null;
+  tidak_makan_seharian_pct?: number | null;
+  rata_rumah_milik_sendiri_pct?: number | null;
+  rata_lantai_rumah?: number | null;
+  air_pdam_pct?: number | null;
+  air_sumur_pct?: number | null;
+  kekurangan_air_pct?: number | null;
+  punya_toilet_pct?: number | null;
+  listrik_pln_pct?: number | null;
+  rata_umur?: number | null;
+  punya_nik_pct?: number | null;
+  tidak_sekolah_pct?: number | null;
+  sd_pct?: number | null;
+  smp_pct?: number | null;
+  sma_pct?: number | null;
+  buta_huruf_pct?: number | null;
 }
 
 export function desaToLlmData(desa: Desa): DesaData {
@@ -73,17 +109,22 @@ export function buildUserPrompt(
   desa: DesaData,
   anggaran: number,
   kegiatan: string[],
+  susenas?: SusenasData | null,
 ): string {
   const coverage =
     desa.estimasi_biaya > 0 ? (anggaran / desa.estimasi_biaya) * 100 : 0;
-  const fmt = (n: number | null, d = 4) =>
-    n === null ? 'Data tidak tersedia' : n.toFixed(d);
+  const fmt = (n: number | string | null | undefined, d = 4): string => {
+    if (n == null) return 'Data tidak tersedia';
+    const num = Number(n);
+    if (Number.isNaN(num)) return 'Data tidak tersedia';
+    return num.toFixed(d);
+  };
   const rp = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
 
-  return `DATA DESA:
+  let prompt = `DATA DESA:
 - Nama: ${desa.nama_desa}, Kec. ${desa.nama_kecamatan}, Kab. ${desa.nama_kabupaten}
 - Status IDM: ${desa.status_idm_computed ?? 'Data tidak tersedia'} (IDM: ${fmt(desa.idm)})
-- IKS: ${fmt(desa.iks)} | IKE: ${fmt(desa.ike)} | IKL: ${fmt(desa.ikl)}
+- Ketahanan Sosial: ${fmt(desa.iks)} | Ketahanan Ekonomi: ${fmt(desa.ike)} | Ketahanan Lingkungan: ${fmt(desa.ikl)}
 - Jumlah jiwa: ${desa.jumlah_jiwa?.toLocaleString('id-ID') ?? 'Data tidak tersedia'} | Rumah tangga: ${desa.jumlah_rt?.toLocaleString('id-ID') ?? 'Data tidak tersedia'}
 - Fasilitas kesehatan: ${desa.ada_faskes ? 'Ada' : 'Belum ada'}
 - Fasilitas SD: ${desa.ada_sd ? 'Ada' : 'Belum ada'}
@@ -94,6 +135,38 @@ export function buildUserPrompt(
 ANGGARAN INTERVENSI: ${rp(anggaran)} (${coverage.toFixed(1)}% dari kebutuhan ideal)
 KEGIATAN YANG DIREKOMENDASIKAN:
 ${kegiatan.map((k) => `- ${k}`).join('\n')}`;
+
+  if (susenas?.tersedia) {
+    prompt += `
+
+DATA SUSENAS 2025 (agregasi per kabupaten, ${susenas.total_rt ?? 0} rumah tangga sampel):
+KETAHANAN PANGAN:
+- Khawatir tidak cukup makan: ${fmt(susenas.khawatir_makan_pct, 1)}%
+- Tidak makan makanan sehat: ${fmt(susenas.tidak_makan_sehat_pct, 1)}%
+- Sedikit jenis makanan: ${fmt(susenas.sedikit_jenis_makanan_pct, 1)}%
+- Lewat waktu makan: ${fmt(susenas.lewat_waktu_makan_pct, 1)}%
+- Makan lebih sedikit: ${fmt(susenas.makan_lebih_sedikit_pct, 1)}%
+- Kehabisan makanan: ${fmt(susenas.kehabisan_makanan_pct, 1)}%
+- Lapar tapi tidak makan: ${fmt(susenas.lapar_tidak_makan_pct, 1)}%
+- Tidak makan seharian: ${fmt(susenas.tidak_makan_seharian_pct, 1)}%
+PERUMAHAN:
+- Rumah milik sendiri: ${fmt(susenas.rata_rumah_milik_sendiri_pct, 1)}%
+- Rata-rata luas lantai: ${fmt(susenas.rata_lantai_rumah, 0)} m²
+- Punya toilet: ${fmt(susenas.punya_toilet_pct, 1)}%
+AIR & ENERGI:
+- Sumber air PDAM: ${fmt(susenas.air_pdam_pct, 1)}%
+- Sumber air sumur: ${fmt(susenas.air_sumur_pct, 1)}%
+- Kekurangan air minum: ${fmt(susenas.kekurangan_air_pct, 1)}%
+- Listrik PLN: ${fmt(susenas.listrik_pln_pct, 1)}%
+PENDIDIKAN:
+- Tidak pernah sekolah: ${fmt(susenas.tidak_sekolah_pct, 1)}%
+- SD: ${fmt(susenas.sd_pct, 1)}%
+- SMP: ${fmt(susenas.smp_pct, 1)}%
+- SMA+: ${fmt(susenas.sma_pct, 1)}%
+- Buta huruf: ${fmt(susenas.buta_huruf_pct, 1)}%`;
+  }
+
+  return prompt;
 }
 
 const NarasiSchema = z.object({
@@ -165,6 +238,7 @@ export async function callLLM(
   desa: DesaData,
   anggaran: number,
   kegiatan: string[],
+  susenas?: SusenasData | null,
 ): Promise<NarasiJson> {
   const apiKey = process.env.LLM_API_KEY;
   if (!apiKey) {
@@ -172,7 +246,7 @@ export async function callLLM(
   }
 
   const baseUrl =
-    process.env.LLM_BASE_URL ?? 'https://api.routr.cloud/v1';
+    process.env.LLM_BASE_URL ?? 'https://api.inferhub.dev/v1';
   const model = process.env.LLM_MODEL ?? 'deepseek-v4-pro';
   const timeoutMs = Number(process.env.LLM_TIMEOUT_MS ?? 180000);
   const maxTokens = Number(process.env.LLM_MAX_TOKENS ?? 8000);
@@ -194,7 +268,7 @@ export async function callLLM(
       ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: buildUserPrompt(desa, anggaran, kegiatan) },
+        { role: 'user', content: buildUserPrompt(desa, anggaran, kegiatan, susenas) },
         { role: 'assistant', content: '{' },
       ],
     }),
@@ -211,9 +285,6 @@ export async function callLLM(
   };
   const text = data.choices?.[0]?.message?.content ?? '';
 
-  // Prefill '{' dikirim sebagai assistant message; model melanjutkan isinya.
-  // Beberapa model menutup JSON dengan '}' final, beberapa mengulang '{' awal.
-  // Ambil dari '{' pertama hingga '}' terakhir yang menyeimbangkan.
   const start = text.indexOf('{');
   const raw = start === -1 ? `{${text}` : text.slice(start);
   const parsed = JSON.parse(raw);
@@ -225,6 +296,7 @@ export async function generateNarasi(
   desa: DesaData,
   anggaran: number,
   kegiatan: string[],
+  susenas?: SusenasData | null,
 ): Promise<{ narasi: NarasiJson; sumber: 'llm' | 'template' }> {
   if (!kegiatan.length) {
     return {
@@ -250,7 +322,7 @@ export async function generateNarasi(
   }
 
   try {
-    const narasi = await callLLM(desa, anggaran, kegiatan);
+    const narasi = await callLLM(desa, anggaran, kegiatan, susenas);
     return { narasi, sumber: 'llm' };
   } catch (err) {
     console.warn('[llm] fallback template:', err instanceof Error ? err.message : err);

@@ -54,15 +54,15 @@ export default function AnggaranInput({
 
   return (
     <div className="w-full space-y-3">
-      <div className="relative flex items-center">
-        <span className="absolute left-4 font-semibold text-slate-400">Rp</span>
+      <div className="glass-input relative flex items-center rounded-xl">
+        <span className="absolute left-4 font-semibold text-white/30">Rp</span>
         <input
           type="text"
           inputMode="numeric"
           value={displayValue}
           onChange={handleInputChange}
           placeholder="0"
-          className="w-full bg-slate-950/60 border border-slate-700/80 rounded-xl py-4 pl-14 pr-4 text-xl font-bold text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/50 transition-all"
+          className="w-full bg-transparent border-none rounded-xl py-4 pl-14 pr-4 text-xl font-bold text-white placeholder-white/20 focus:outline-none transition-all"
         />
       </div>
       <div className="flex flex-wrap gap-2">
@@ -73,8 +73,8 @@ export default function AnggaranInput({
             onClick={() => setPreset(preset.value)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
               value === preset.value
-                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                : 'bg-slate-800/50 text-slate-300 border-slate-700/50 hover:bg-emerald-500/15 hover:text-emerald-300 hover:border-emerald-500/30'
+                ? 'bg-white text-black border-white'
+                : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10 hover:border-white/20'
             }`}
           >
             {preset.label}

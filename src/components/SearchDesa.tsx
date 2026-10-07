@@ -68,8 +68,8 @@ export default function SearchDesa({ onSelect, selected }: SearchDesaProps) {
 
   return (
     <div className="relative w-full z-50">
-      <div className="relative flex items-center">
-        <Search className="absolute left-4 w-5 h-5 text-slate-400 pointer-events-none" />
+      <div className="glass-input relative flex items-center rounded-xl">
+        <Search className="absolute left-4 w-5 h-5 text-white/30 pointer-events-none" />
         <input
           type="text"
           value={query}
@@ -79,11 +79,11 @@ export default function SearchDesa({ onSelect, selected }: SearchDesaProps) {
           }}
           onFocus={() => results.length > 0 && setIsOpen(true)}
           placeholder="Cari desa, kecamatan, atau kabupaten (min. 2 karakter)"
-          className="w-full bg-slate-950/60 border border-slate-700/80 rounded-xl py-4 pl-12 pr-12 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/50 transition-all"
+          className="w-full bg-transparent border-none rounded-xl py-4 pl-12 pr-12 text-white placeholder-white/30 focus:outline-none transition-all"
           autoComplete="off"
         />
         {loading && (
-          <div className="absolute right-4 w-4 h-4 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+          <div className="absolute right-4 w-4 h-4 rounded-full border-2 border-white/20 border-t-white/60 animate-spin" />
         )}
       </div>
 
@@ -91,10 +91,10 @@ export default function SearchDesa({ onSelect, selected }: SearchDesaProps) {
         (results.length > 0 ||
           error ||
           (!loading && debouncedQuery.length >= 2)) && (
-          <div className="absolute top-full left-0 right-0 mt-2 rounded-xl max-h-80 overflow-y-auto z-50 border border-slate-700/80 bg-slate-950/95 backdrop-blur-md shadow-2xl divide-y divide-slate-800/60">
+          <div className="absolute top-full left-0 right-0 mt-2 rounded-xl max-h-80 overflow-y-auto z-50 border border-white/10 backdrop-blur-2xl bg-[#0a0b0f]/90 shadow-2xl divide-y divide-white/5">
             {error && <div className="p-4 text-sm text-rose-300">{error}</div>}
             {!error && results.length === 0 && !loading && (
-              <div className="p-4 text-center text-slate-400 text-sm">
+              <div className="p-4 text-center text-white/30 text-sm">
                 Desa tidak ditemukan
               </div>
             )}
@@ -110,10 +110,10 @@ export default function SearchDesa({ onSelect, selected }: SearchDesaProps) {
                   setIsOpen(false);
                   onSelect(desa);
                 }}
-                className="w-full text-left px-5 py-4 hover:bg-slate-800/60 transition-colors flex flex-col gap-2 group"
+                className="w-full text-left px-5 py-4 hover:bg-white/[0.04] transition-colors flex flex-col gap-2 group"
               >
                 <div className="flex justify-between items-start gap-3">
-                  <span className="font-semibold text-slate-100 group-hover:text-emerald-300 transition-colors">
+                  <span className="font-semibold text-white group-hover:text-white/80 transition-colors">
                     {desa.nama_desa}
                   </span>
                   <div className="flex flex-wrap gap-1.5 justify-end text-[11px]">
@@ -133,11 +133,11 @@ export default function SearchDesa({ onSelect, selected }: SearchDesaProps) {
                     )}
                   </div>
                 </div>
-                <span className="text-sm text-slate-400">
+                <span className="text-sm text-white/40">
                   Kec. {desa.nama_kecamatan}
-                  <span className="text-slate-600"> · </span>
+                  <span className="text-white/20"> · </span>
                   Kab. {desa.nama_kabupaten}
-                  <span className="text-slate-600"> · </span>
+                  <span className="text-white/20"> · </span>
                   {desa.nama_provinsi}
                 </span>
               </button>

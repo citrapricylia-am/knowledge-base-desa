@@ -44,3 +44,9 @@ next-env.d.ts
 # local backups (never commit)
 *.bak_*
 *.bak
+
+# data mentah BPS (836 MB — terlalu besar untuk git, GitHub batas 100MB/file)
+/scripts/data/
+
+# video hero (9.8 MB) — host di CDN/Storage, set NEXT_PUBLIC_HERO_VIDEO_URL
+/public/hero-video.mp4

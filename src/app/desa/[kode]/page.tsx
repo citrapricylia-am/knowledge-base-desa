@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, MapPin, Trees, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, MapPin } from 'lucide-react';
 import { queryOne } from '@/lib/db';
 import { toPublicDesa } from '@/lib/analisis';
 import ProfilIDM from '@/components/ProfilIDM';

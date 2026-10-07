@@ -92,6 +92,18 @@ export interface NarasiJson {
   disclaimer: string;
 }
 
+export interface RincianBiayaPayload {
+  komponen: { label: string; nilai: number; dasar: string }[];
+  subtotal: number;
+  idmMultiplier: number;
+  idmLabel: string;
+  podesMultiplier: number;
+  podesLabel: string;
+  sebelumPembulatan: number;
+  dibatasiMinMax: boolean;
+  total: number;
+}
+
 export interface AnalisisPayload {
   anggaran: number;
   estimasi_biaya_ideal: number;
@@ -102,6 +114,7 @@ export interface AnalisisPayload {
   sumber_narasi: 'llm' | 'template' | 'cache';
   tahun_data: string;
   podes_tersedia: boolean;
+  rincian_biaya: RincianBiayaPayload;
 }
 
 export interface AnalisisResponse {
