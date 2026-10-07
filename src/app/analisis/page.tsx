@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowRight, ArrowLeft, LogOut } from 'lucide-react';
+import { ArrowRight, LogOut } from 'lucide-react';
 import SearchDesa from '@/components/SearchDesa';
 import AnggaranInput from '@/components/AnggaranInput';
 import type { DesaSearchResult } from '@/lib/types';
@@ -55,14 +55,7 @@ export default function AnalisisPage() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-8 space-y-6 animate-slide-up">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 print-hide">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Beranda
-        </Link>
+      <div className="flex items-center justify-end gap-3 print-hide">
         <button
           type="button"
           onClick={async () => {
@@ -81,10 +74,8 @@ export default function AnalisisPage() {
         <h1 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
           Pilih desa & masukkan anggaran
         </h1>
-        <p className="text-white/50 text-base leading-relaxed">
-          Cari desa atau kelurahan, tentukan anggaran intervensi, lalu
-          jalankan analisis. Sistem akan menyatukan data Podes, IDM, dan
-          Susenas lalu menyusun rekomendasi dengan AI.
+        <p className="text-white/50 text-base">
+          Cari desa/kelurahan, tentukan anggaran intervensi, lalu jalankan analisis.
         </p>
       </header>
 

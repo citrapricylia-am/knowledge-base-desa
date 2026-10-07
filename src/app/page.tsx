@@ -85,14 +85,6 @@ export default function Home() {
               rekomendasi yang dapat diaudit.
             </p>
 
-            <p className="mx-auto max-w-lg text-sm text-white/45 leading-relaxed">
-              Analisis menyatukan tiga sumber resmi — potensi desa (Podes 2025),
-              Indeks Desa Membangun (IDM 2024), dan kondisi rumah tangga
-              (Susenas 2025) — lalu disusun ulang oleh AI menjadi rekomendasi
-              kegiatan yang bisa diukur. Masukkan email Madani Berkelanjutan
-              di bawah untuk membuka akses.
-            </p>
-
             {/* Stats — clean horizontal row */}
             <div className="flex flex-wrap items-center justify-center gap-6 text-white/80">
               <div className="flex flex-col">
