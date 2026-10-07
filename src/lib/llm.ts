@@ -9,7 +9,7 @@ Berdasarkan data yang diberikan (Podes 2025, IDM 2024, dan Susenas 2025), tulis 
 
 STRUKTUR OUTPUT WAJIB (JSON valid, tanpa teks di luar JSON):
 {
-  "konteks": "Analisis situasi desa 8-12 kalimat. Jelaskan: posisi IDM dan apa artinya untuk desa ini, pilar IDM mana yang paling lemah dan mengapa, kondisi demografi yang menonjol (jumlah jiwa, RT, fasilitas yang ada/tidak ada), tantangan utama dari data Podes, dan kondisi ketahanan pangan/perumahan/air dari Susenas jika tersedia. Hubungkan data antar sumber — misal jika IKS rendah dan Susenas menunjukkan ketahanan pangan buruk, jelaskan kaitannya.",
+  "konteks": "Analisis situasi desa 8-12 kalimat. Jelaskan: posisi IDM dan apa artinya untuk desa ini, pilar IDM mana yang paling lemah dan mengapa, kondisi demografi yang menonjol (jumlah jiwa, RT, fasilitas yang ada/tidak ada), tantangan utama dari data Podes, kondisi ketahanan pangan/perumahan/air dari Susenas jika tersedia, dan kondisi lingkungan/wilayah (luas wilayah, hutan alam, lahan kritis — jika lahan kritis luas atau hutan tersisa sedikit, kaitkan langsung dengan pilar Ketahanan Lingkungan). Hubungkan data antar sumber — misal jika IKL rendah dan lahan kritis luas, jelaskan kaitannya.",
   "posisi_anggaran": "Analisis posisi anggaran 5-8 kalimat. Jelaskan: berapa anggaran vs kebutuhan ideal, persentase cakupan, apa yang bisa dan tidak bisa dilakukan dengan anggaran ini, prioritas intervensi yang paling mendesak berdasarkan kondisi desa, dan trade-off yang perlu dipertimbangkan.",
   "rekomendasi": [
     {
@@ -49,6 +49,12 @@ export interface DesaData {
   tantangan: string | null;
   klasifikasi_podes: string | null;
   estimasi_biaya: number;
+  // Lingkungan & wilayah — penting agar LLM bisa menganalisis pilar IKL
+  // dengan data nyata (hutan, lahan kritis, luas), bukan tebakan.
+  luas_wilayah_ha?: number | null;
+  hutan_alam_ha?: number | null;
+  lahan_kritis_status?: string | null;
+  lahan_kritis_ha?: number | null;
 }
 
 export interface SusenasData {
@@ -96,6 +102,10 @@ export function desaToLlmData(desa: Desa): DesaData {
     tantangan: translateTantangan(desa.tantangan),
     klasifikasi_podes: desa.klasifikasi_podes ?? null,
     estimasi_biaya: Number(desa.estimasi_biaya ?? 0),
+    luas_wilayah_ha: numOrNull(desa.luas_admin_ha ?? desa.luas_hektar),
+    hutan_alam_ha: numOrNull(desa.hutan_alam_ha_2024),
+    lahan_kritis_status: desa.lahan_kritis_status ?? null,
+    lahan_kritis_ha: numOrNull(desa.lahan_kritis_ha),
   };
 }
 
@@ -132,6 +142,10 @@ export function buildUserPrompt(
 - Tantangan utama: ${desa.tantangan ?? 'Data tidak tersedia'}
 - Klasifikasi Podes: ${desa.klasifikasi_podes ?? 'Data tidak tersedia'}
 - Estimasi kebutuhan ideal: ${rp(desa.estimasi_biaya)}
+LINGKUNGAN & WILAYAH (Podes 2025):
+- Luas wilayah: ${desa.luas_wilayah_ha != null ? fmt(desa.luas_wilayah_ha, 1) + ' ha' : 'Data tidak tersedia'}
+- Hutan alam: ${desa.hutan_alam_ha != null ? fmt(desa.hutan_alam_ha, 1) + ' ha' + (desa.luas_wilayah_ha ? ` (${((Number(desa.hutan_alam_ha) / Number(desa.luas_wilayah_ha)) * 100).toFixed(1)}% dari wilayah)` : '') : 'Data tidak tersedia'}
+- Lahan kritis: ${desa.lahan_kritis_ha != null ? fmt(desa.lahan_kritis_ha, 1) + ' ha' + (desa.luas_wilayah_ha ? ` (${((Number(desa.lahan_kritis_ha) / Number(desa.luas_wilayah_ha)) * 100).toFixed(1)}% dari wilayah)` : '') : 'Data tidak tersedia'} | Status: ${desa.lahan_kritis_status ?? 'Data tidak tersedia'}
 ANGGARAN INTERVENSI: ${rp(anggaran)} (${coverage.toFixed(1)}% dari kebutuhan ideal)
 KEGIATAN YANG DIREKOMENDASIKAN:
 ${kegiatan.map((k) => `- ${k}`).join('\n')}`;
