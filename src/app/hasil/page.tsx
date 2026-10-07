@@ -20,6 +20,8 @@ function HasilContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [paramsReady, setParamsReady] = useState(false);
+  const [narasiLoading, setNarasiLoading] = useState(false);
+  const [narasiError, setNarasiError] = useState(false);
 
   // Tunggu satu siklus render supaya useSearchParams siap
   // (return kosong di render pertama — bug Next 16 + Suspense)
@@ -40,21 +42,59 @@ function HasilContent() {
     setLoading(true);
     setError(null);
 
+    // TAHAP 1 (cepat, ~1 detik): angka, kegiatan, rincian biaya.
+    // Halaman langsung tampil — tidak menunggu LLM 20-35 detik.
     fetch('/api/analisis', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ kode_bps: kodeBps, anggaran: anggaranParam }),
+      body: JSON.stringify({ kode_bps: kodeBps, anggaran: anggaranParam, cepat: true }),
     })
       .then(async (res) => {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Gagal menganalisis');
         return json as AnalisisResponse;
       })
-      .then((json) => { if (!cancelled) setData(json); })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Gagal menganalisis');
+      .then((json) => {
+        if (cancelled) return;
+        setData(json);
+        setLoading(false);
+
+        // TAHAP 2 (lambat, di belakang layar): narasi AI.
+        // Kalau cache sudah ada, tahap 1 sudah membawa narasinya —
+        // tidak perlu panggil lagi.
+        if (json.analisis.sumber_narasi !== 'pending') return;
+
+        setNarasiLoading(true);
+        fetch('/api/narasi', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ kode_bps: kodeBps, anggaran: anggaranParam }),
+        })
+          .then(async (res) => {
+            const nj = await res.json();
+            if (!res.ok) throw new Error(nj.error || 'Gagal menyusun narasi');
+            return nj as { narasi: AnalisisResponse['analisis']['narasi']; sumber_narasi: AnalisisResponse['analisis']['sumber_narasi'] };
+          })
+          .then((nj) => {
+            if (cancelled) return;
+            setData((prev) =>
+              prev
+                ? { ...prev, analisis: { ...prev.analisis, narasi: nj.narasi, sumber_narasi: nj.sumber_narasi } }
+                : prev,
+            );
+          })
+          .catch(() => {
+            // Narasi gagal bukan alasan menghapus angka yang sudah tampil.
+            if (!cancelled) setNarasiError(true);
+          })
+          .finally(() => { if (!cancelled) setNarasiLoading(false); });
       })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Gagal menganalisis');
+          setLoading(false);
+        }
+      });
 
     return () => { cancelled = true; };
   }, [paramsReady, kodeBps, anggaranParam]);
@@ -212,6 +252,8 @@ function HasilContent() {
           iks={desa.iks ?? null}
           ike={desa.ike ?? null}
           ikl={desa.ikl ?? null}
+          sedangMenyusun={narasiLoading}
+          gagalMenyusun={narasiError}
         />
       </div>
 

@@ -111,7 +111,7 @@ export interface AnalisisPayload {
   tier: Tier;
   kegiatan: string[];
   narasi: NarasiJson;
-  sumber_narasi: 'llm' | 'template' | 'cache';
+  sumber_narasi: 'llm' | 'template' | 'cache' | 'pending';
   tahun_data: string;
   podes_tersedia: boolean;
   rincian_biaya: RincianBiayaPayload;

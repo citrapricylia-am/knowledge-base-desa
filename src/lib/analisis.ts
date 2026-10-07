@@ -203,6 +203,7 @@ export function toPublicDesa(desa: Desa) {
 export async function analyzeAnggaran(
   desa: Desa,
   anggaran: number,
+  opsi: { tanpaLlm?: boolean } = {},
 ): Promise<AnalisisPayload> {
   const rincian = rincianEstimasiBiaya(desa);
   const estimasi = rincian.total;
@@ -237,6 +238,25 @@ export async function analyzeAnggaran(
 
   const keys = parseRekomendasiKeys(desa);
   const kegiatan = podesTersedia ? await resolveKegiatan(keys, tier) : [];
+
+  // Mode cepat: kembalikan angka + kegiatan tanpa menunggu LLM (20-35 detik).
+  // Halaman hasil memakai ini untuk tampil <1 detik, lalu meminta narasi
+  // via /api/narasi di belakang layar. JANGAN tulis cache di sini —
+  // narasi masih kosong, nanti menimpa narasi asli.
+  if (opsi.tanpaLlm) {
+    return {
+      anggaran,
+      estimasi_biaya_ideal: estimasi,
+      coverage_pct: Math.round(coveragePct * 100) / 100,
+      tier,
+      kegiatan,
+      rincian_biaya: rincian,
+      narasi: { konteks: '', posisi_anggaran: '', rekomendasi: [], disclaimer: '' },
+      sumber_narasi: 'pending',
+      tahun_data: 'Podes 2025, IDM 2024',
+      podes_tersedia: podesTersedia,
+    };
+  }
 
   // Fetch Susenas data untuk konteks LLM
   let susenasData: SusenasData | null = null;

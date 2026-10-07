@@ -10,10 +10,14 @@ interface NarasiPanelProps {
   sumber: 'llm' | 'template' | 'cache' | string;
   kegiatan?: string[];
   analisis?: AnalisisPayload;
-  idm?: number | null;
-  iks?: number | null;
-  ike?: number | null;
-  ikl?: number | null;
+  idm?: number | string | null;
+  iks?: number | string | null;
+  ike?: number | string | null;
+  ikl?: number | string | null;
+  /** Narasi AI masih disusun di belakang layar — tampilkan skeleton. */
+  sedangMenyusun?: boolean;
+  /** Narasi gagal disusun — angka tetap tampil, narasi diberi pesan. */
+  gagalMenyusun?: boolean;
 }
 
 /**
@@ -26,13 +30,36 @@ interface NarasiPanelProps {
  */
 
 function pecahParagraf(teks: string): string[] {
-  // Pecah paragraf panjang jadi kalimat-kalimat pendek
-  // supaya tidak numpuk jadi blok teks yang overwhelm.
-  const kalimat = teks.match(/[^.!?]+[.!?]+/g) ?? [teks];
+  // Pecah paragraf panjang jadi blok pendek supaya tidak overwhelm.
+  //
+  // Titik desimal & ribuan JANGAN dianggap akhir kalimat — tanpa penjaga
+  // ini "0.7444" terbelah jadi "0." + " 7444" dan angka tampil rusak.
+  // Akhir kalimat sah = . ! ? yang TIDAK diapit angka di kedua sisi.
+  if (!teks) return [''];
+
+  const kalimat: string[] = [];
+  let mulai = 0;
+  for (let i = 0; i < teks.length; i++) {
+    const c = teks[i];
+    if (c !== '.' && c !== '!' && c !== '?') continue;
+    // titik antar angka (0.7444 / 2.291) bukan akhir kalimat
+    const sebelumAngka = /\d/.test(teks[i - 1] ?? '');
+    const sesudahAngka = /\d/.test(teks[i + 1] ?? '');
+    if (sebelumAngka && sesudahAngka) continue;
+    // serap tanda baca berturut (?! ...)
+    let j = i;
+    while (j + 1 < teks.length && '.!?'.includes(teks[j + 1])) j++;
+    kalimat.push(teks.slice(mulai, j + 1).trim());
+    mulai = j + 1;
+    i = j;
+  }
+  const ekor = teks.slice(mulai).trim();
+  if (ekor) kalimat.push(ekor);
+
   const blok: string[] = [];
   let current = '';
   for (const k of kalimat) {
-    current += (current ? ' ' : '') + k.trim();
+    current += (current ? ' ' : '') + k;
     if (current.length > 180) {
       blok.push(current.trim());
       current = '';
@@ -42,8 +69,11 @@ function pecahParagraf(teks: string): string[] {
   return blok.length ? blok : [teks];
 }
 
-function PilarBar({ label, value, isWeak }: { label: string; value: number | null; isWeak?: boolean }) {
-  const v = value ?? 0;
+function PilarBar({ label, value, isWeak }: { label: string; value: number | string | null; isWeak?: boolean }) {
+  // Angka dari PostgreSQL (numeric) datang sebagai STRING lewat JSON.
+  // Tanpa Number() di sini, .toFixed() melempar "is not a function".
+  const num = value == null ? null : Number(value);
+  const v = num != null && Number.isFinite(num) ? num : 0;
   const pct = Math.min(100, v * 100);
   const color = isWeak ? 'bg-rose-500' : v >= 0.71 ? 'bg-emerald-500' : v >= 0.6 ? 'bg-amber-500' : 'bg-rose-500';
   return (
@@ -51,7 +81,7 @@ function PilarBar({ label, value, isWeak }: { label: string; value: number | nul
       <div className="flex justify-between items-baseline">
         <span className="text-xs text-white/50">{label}</span>
         <span className={`text-xs font-medium tabular-nums ${isWeak ? 'text-rose-400' : 'text-white/70'}`}>
-          {value?.toFixed(4) ?? '—'}
+          {num != null && Number.isFinite(num) ? num.toFixed(4) : '—'}
         </span>
       </div>
       <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
@@ -84,22 +114,30 @@ function CoverageRing({ pct }: { pct: number }) {
   );
 }
 
-export default function NarasiPanel({ narasi, sumber, kegiatan, idm, iks, ike, ikl, analisis }: NarasiPanelProps) {
+export default function NarasiPanel({ narasi, sumber, kegiatan, idm, iks, ike, ikl, analisis, sedangMenyusun, gagalMenyusun }: NarasiPanelProps) {
   const [openIdx, setOpenIdx] = useState<number | null>(0);
 
   const badge =
-    sumber === 'llm'
-      ? { label: 'Analisis AI', className: 'bg-violet-500/10 text-violet-300 border-violet-500/20', Icon: Sparkles }
-      : sumber === 'cache'
-        ? { label: 'Analisis AI', className: 'bg-sky-500/10 text-sky-300 border-sky-500/20', Icon: FileText }
-        : { label: 'Template', className: 'bg-white/5 text-white/40 border-white/10', Icon: FileText };
+    sedangMenyusun
+      ? { label: 'Menyusun…', className: 'bg-white/5 text-white/50 border-white/10', Icon: Sparkles }
+      : gagalMenyusun
+        ? { label: 'Narasi gagal', className: 'bg-amber-500/10 text-amber-300 border-amber-500/20', Icon: FileText }
+        : sumber === 'llm'
+          ? { label: 'Analisis AI', className: 'bg-violet-500/10 text-violet-300 border-violet-500/20', Icon: Sparkles }
+          : sumber === 'cache'
+            ? { label: 'Analisis AI', className: 'bg-sky-500/10 text-sky-300 border-sky-500/20', Icon: FileText }
+            : { label: 'Template', className: 'bg-white/5 text-white/40 border-white/10', Icon: FileText };
 
   const Icon = badge.Icon;
   const konteksBlok = pecahParagraf(narasi.konteks);
   const posisiBlok = pecahParagraf(narasi.posisi_anggaran);
-  const coverage = analisis?.coverage_pct ?? 0;
-  const pilarTerlemah = iks != null && ike != null && ikl != null
-    ? [{ v: iks, l: 'Sosial' }, { v: ike, l: 'Ekonomi' }, { v: ikl, l: 'Lingkungan' }].sort((a, b) => a.v - b.v)[0]
+  const coverage = Number(analisis?.coverage_pct ?? 0) || 0;
+  // Number() wajib: nilai numeric Postgres tiba sebagai string
+  const nIks = iks == null ? null : Number(iks);
+  const nIke = ike == null ? null : Number(ike);
+  const nIkl = ikl == null ? null : Number(ikl);
+  const pilarTerlemah = nIks != null && nIke != null && nIkl != null
+    ? [{ v: nIks, l: 'Sosial' }, { v: nIke, l: 'Ekonomi' }, { v: nIkl, l: 'Lingkungan' }].sort((a, b) => a.v - b.v)[0]
     : null;
 
   return (
@@ -149,23 +187,55 @@ export default function NarasiPanel({ narasi, sumber, kegiatan, idm, iks, ike, i
       {/* === KONTEKS DESA === */}
       <div className="rounded-xl border border-white/5 bg-white/[0.03] p-5 space-y-3">
         <h4 className="text-xs uppercase tracking-wide text-white/50">Konteks desa</h4>
-        {konteksBlok.map((blok, i) => (
-          <p key={i} className="text-white/75 leading-relaxed text-sm">{blok}</p>
-        ))}
+        {sedangMenyusun ? (
+          <div className="space-y-2.5" aria-live="polite" aria-busy="true">
+            <div className="h-3 rounded bg-white/[0.07] animate-pulse" style={{ width: '94%' }} />
+            <div className="h-3 rounded bg-white/[0.07] animate-pulse" style={{ width: '88%' }} />
+            <div className="h-3 rounded bg-white/[0.07] animate-pulse" style={{ width: '72%' }} />
+            <p className="pt-1 text-xs text-white/35">AI sedang membaca data desa dan menyusun analisis…</p>
+          </div>
+        ) : gagalMenyusun ? (
+          <p className="text-sm text-white/45">
+            Narasi AI gagal disusun. Angka dan rekomendasi di bawah tetap valid —
+            muat ulang halaman untuk mencoba lagi.
+          </p>
+        ) : (
+          konteksBlok.map((blok, i) => (
+            <p key={i} className="text-white/75 leading-relaxed text-sm">{blok}</p>
+          ))
+        )}
       </div>
 
       {/* === POSISI ANGGARAN === */}
       <div className="rounded-xl border border-white/5 bg-white/[0.03] p-5 space-y-3">
         <h4 className="text-xs uppercase tracking-wide text-white/50">Posisi anggaran</h4>
-        {posisiBlok.map((blok, i) => (
-          <p key={i} className="text-white/75 leading-relaxed text-sm">{blok}</p>
-        ))}
+        {sedangMenyusun ? (
+          <div className="space-y-2.5">
+            <div className="h-3 rounded bg-white/[0.07] animate-pulse" style={{ width: '90%' }} />
+            <div className="h-3 rounded bg-white/[0.07] animate-pulse" style={{ width: '64%' }} />
+          </div>
+        ) : gagalMenyusun ? (
+          <p className="text-sm text-white/45">Belum tersedia.</p>
+        ) : (
+          posisiBlok.map((blok, i) => (
+            <p key={i} className="text-white/75 leading-relaxed text-sm">{blok}</p>
+          ))
+        )}
       </div>
 
       {/* === REKOMENDASI === */}
       <div className="space-y-2">
         <h4 className="text-sm font-medium text-white/70">Rekomendasi kegiatan</h4>
-        {narasi.rekomendasi.map((item, idx) => {
+        {sedangMenyusun && (
+          <div className="space-y-2">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3">
+                <div className="h-3.5 rounded bg-white/[0.07] animate-pulse" style={{ width: `${70 - i * 12}%` }} />
+              </div>
+            ))}
+          </div>
+        )}
+        {!sedangMenyusun && narasi.rekomendasi.map((item, idx) => {
           const open = openIdx === idx;
           return (
             <div

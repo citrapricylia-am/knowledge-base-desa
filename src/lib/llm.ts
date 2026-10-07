@@ -15,9 +15,9 @@ STRUKTUR OUTPUT WAJIB (JSON valid, tanpa teks di luar JSON):
     {
       "judul": "Nama kegiatan (dari daftar yang diberikan)",
       "poin": [
-        "Alasan mengapa kegiatan ini diprioritaskan untuk desa ini (kaitkan dengan data spesifik — angka IDM, tantangan, fasilitas yang kurang)",
-        "Detail pelaksanaan yang konkret (lokasi, target penerima, metode)",
-        "Dampak yang diharapkan pada pilar IDM mana (IKS/IKE/IKL) dan bagaimana mengukurnya"
+        "Alasan kegiatan ini diprioritaskan — kaitkan ke data spesifik (maks 2 kalimat)",
+        "Detail pelaksanaan konkret: lokasi, target penerima, metode (maks 2 kalimat)",
+        "Dampak pada pilar IDM mana dan cara mengukurnya (maks 2 kalimat)"
       ]
     }
   ],
@@ -301,8 +301,49 @@ export async function callLLM(
 
   const start = text.indexOf('{');
   const raw = start === -1 ? `{${text}` : text.slice(start);
-  const parsed = JSON.parse(raw);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    // Output kehabisan token di tengah string -> JSON tidak tertutup.
+    // Daripada jatuh ke template (narasi generik), coba tutup paksa:
+    // buang ekor tak lengkap sampai tanda kutip/koma terakhir yang aman,
+    // lalu tutup semua bracket yang masih terbuka.
+    parsed = JSON.parse(tutupJsonTerpotong(raw));
+  }
   return NarasiSchema.parse(parsed);
+}
+
+/**
+ * Menutup JSON yang terpotong karena habis token.
+ *
+ * Strategi: potong di akhir elemen lengkap terakhir, lalu tutup
+ * bracket yang masih terbuka. Dipakai hanya sebagai penyelamat —
+ * kalau tetap gagal, pemanggil akan fallback ke template.
+ */
+function tutupJsonTerpotong(raw: string): string {
+  // Buang ekor setelah tanda baca struktural terakhir yang masuk akal
+  let s = raw.replace(/,\s*$/, '');
+
+  // Kalau berakhir di tengah string, tutup string itu
+  const kutipGanjil = (s.match(/(?<!\\)"/g)?.length ?? 0) % 2 === 1;
+  if (kutipGanjil) s += '"';
+
+  // Hitung bracket yang belum tertutup, abaikan yang di dalam string
+  let dalamString = false;
+  const tumpukan: string[] = [];
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '"' && s[i - 1] !== '\\') dalamString = !dalamString;
+    if (dalamString) continue;
+    if (c === '{' || c === '[') tumpukan.push(c);
+    else if (c === '}' || c === ']') tumpukan.pop();
+  }
+  while (tumpukan.length) {
+    s += tumpukan.pop() === '{' ? '}' : ']';
+  }
+  return s;
 }
 
 /** Coba LLM; jika gagal/timeout → template. Tidak retry. */

@@ -1,16 +1,25 @@
 import { NextResponse } from 'next/server';
 import { queryOne } from '@/lib/db';
-import { analyzeAnggaran, toPublicDesa } from '@/lib/analisis';
+import { analyzeAnggaran } from '@/lib/analisis';
 import type { Desa } from '@/lib/types';
 
 export const runtime = 'nodejs';
 
+/**
+ * Endpoint khusus narasi AI.
+ *
+ * Dipisah dari /api/analisis supaya halaman hasil bisa tampil cepat:
+ * - /api/analisis {cepat:true} -> angka + kegiatan, ~1 detik
+ * - /api/narasi (endpoint ini) -> narasi LLM, 20-35 detik, jalan di belakang layar
+ *
+ * Narasi hasil panggilan ini ditulis ke cache oleh analyzeAnggaran,
+ * jadi kunjungan berikutnya untuk desa+anggaran yang sama langsung instan.
+ */
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
       kode_bps?: string;
       anggaran?: number;
-      cepat?: boolean;
     };
     const kode_bps = String(body.kode_bps ?? '').trim();
     const anggaran = Number(body.anggaran);
@@ -48,19 +57,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const analisis = await analyzeAnggaran(desa, Math.floor(anggaran), {
-      tanpaLlm: body.cepat === true,
-    });
+    // Jalur penuh (dengan LLM). Cache dicek di dalam analyzeAnggaran.
+    const analisis = await analyzeAnggaran(desa, Math.floor(anggaran));
 
     return NextResponse.json({
-      desa: toPublicDesa(desa),
-      analisis,
+      narasi: analisis.narasi,
+      sumber_narasi: analisis.sumber_narasi,
     });
   } catch (error) {
-    console.error('Analisis error:', error);
+    console.error('Narasi error:', error);
     return NextResponse.json(
       {
-        error: 'Internal server error',
+        error: 'Gagal menyusun narasi',
         detail: error instanceof Error ? error.message : String(error),
       },
       { status: 500 },
