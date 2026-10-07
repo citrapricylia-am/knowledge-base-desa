@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowUpRight, ArrowRight } from 'lucide-react';
+import { ArrowUpRight, ArrowRight, XCircle } from 'lucide-react';
 import SearchDesa from '@/components/SearchDesa';
 import AnggaranInput from '@/components/AnggaranInput';
 import SmoothVideo from '@/components/SmoothVideo';
@@ -17,9 +17,49 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
-  const scrollToForm = () => {
+  // === Gerbang email @madaniberkelanjutan.id ===
+  const [sudahMasuk, setSudahMasuk] = useState<boolean | null>(null);
+  const [email, setEmail] = useState('');
+  const [gateError, setGateError] = useState<string | null>(null);
+  const [gateLoading, setGateLoading] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/gate')
+      .then((r) => setSudahMasuk(r.ok))
+      .catch(() => setSudahMasuk(false));
+  }, []);
+
+  async function masuk(e: React.FormEvent) {
+    e.preventDefault();
+    setGateError(null);
+    if (!email.trim()) {
+      setGateError('Masukkan email Anda dulu.');
+      return;
+    }
+    setGateLoading(true);
+    try {
+      const res = await fetch('/api/gate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      if (res.ok) {
+        setSudahMasuk(true);
+        setEmail('');
+      } else {
+        const j = await res.json().catch(() => ({}));
+        setGateError(j.detail ?? j.error ?? 'Email ditolak');
+      }
+    } catch {
+      setGateError('Koneksi bermasalah — coba lagi.');
+    } finally {
+      setGateLoading(false);
+    }
+  }
+
+  function scrollToForm() {
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,20 +128,58 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Aero Hero pill button */}
-            <div className="flex justify-center pt-4">
-              <button
-                onClick={scrollToForm}
-                className="group aero-pill flex cursor-pointer items-center justify-center gap-0 rounded-full border-none bg-transparent px-0 py-5 font-normal shadow-none hover:bg-transparent"
+            {/* Gerbang + Aero Hero pill button */}
+            <div className="space-y-4">
+              <form
+                onSubmit={masuk}
+                className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3"
               >
-                <span className="aero-pill-bg rounded-full px-7 py-3.5 text-base font-medium">
-                  Mulai Analisis
-                </span>
-                <div className="aero-pill-bg relative flex h-fit cursor-pointer items-center overflow-hidden rounded-full p-5">
-                  <ArrowUpRight className="arrow-slide-in absolute h-5 w-5" />
-                  <ArrowUpRight className="arrow-slide-out absolute h-5 w-5" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (gateError) setGateError(null);
+                  }}
+                  placeholder="email@madaniberkelanjutan.id"
+                  aria-label="Email untuk akses analisis"
+                  disabled={sudahMasuk === true}
+                  className="glass-input w-full sm:w-80 rounded-full px-5 py-3.5 text-sm text-white placeholder:text-white/30 outline-none disabled:opacity-40"
+                />
+                <button
+                  type="submit"
+                  disabled={gateLoading || sudahMasuk === true}
+                  className="group aero-pill flex cursor-pointer items-center justify-center gap-0 rounded-full border-none bg-transparent px-0 py-5 font-normal shadow-none hover:bg-transparent disabled:cursor-not-allowed"
+                >
+                  <span
+                    className={`aero-pill-bg rounded-full px-7 py-3.5 text-base font-medium ${
+                      gateLoading || sudahMasuk === true ? 'opacity-50' : ''
+                    }`}
+                  >
+                    {gateLoading ? 'Memeriksa…' : sudahMasuk === true ? 'Sudah masuk' : 'Mulai Analisis'}
+                  </span>
+                  <div className="aero-pill-bg relative flex h-fit cursor-pointer items-center overflow-hidden rounded-full p-5">
+                    <ArrowUpRight className="arrow-slide-in absolute h-5 w-5" />
+                    <ArrowUpRight className="arrow-slide-out absolute h-5 w-5" />
+                  </div>
+                </button>
+              </form>
+
+              {/* Alert email ditolak */}
+              {gateError && (
+                <div
+                  role="alert"
+                  className="mx-auto flex max-w-md items-start gap-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-left animate-fade-in"
+                >
+                  <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+                  <div>
+                    <p className="text-sm font-medium text-rose-300">Email ditolak</p>
+                    <p className="text-xs text-rose-300/70 leading-relaxed mt-0.5">
+                      {gateError}
+                    </p>
+                  </div>
                 </div>
-              </button>
+              )}
             </div>
           </div>
         </div>
@@ -127,7 +205,28 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="glass-card rounded-3xl p-6 md:p-8">
+          {sudahMasuk === null ? (
+            <div className="glass-card rounded-3xl p-8 text-center text-white/40">
+              Memeriksa sesi login…
+            </div>
+          ) : sudahMasuk === false ? (
+            <div className="glass-card rounded-3xl p-8 space-y-3 text-center">
+              <p className="text-white/70 font-medium">
+                Form analisis hanya untuk anggota Madani Berkelanjutan
+              </p>
+              <p className="text-white/40 text-sm">
+                Masukkan email @madaniberkelanjutan.id di kolom paling atas
+                untuk membuka akses.
+              </p>
+              <button
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                className="text-sm text-white/60 underline underline-offset-4 hover:text-white transition-colors"
+              >
+                Kembali ke form login
+              </button>
+            </div>
+          ) : (
+            <div className="glass-card rounded-3xl p-6 md:p-8">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-white/70 ml-1">
@@ -184,6 +283,7 @@ export default function Home() {
               </button>
             </form>
           </div>
+          )}
 
           <p className="mt-6 text-center text-xs text-white/30 leading-relaxed">
             Sumber: Podes 2025 · IDM 2024 · BPS Indonesia. Bukan nasihat investasi — untuk penyaringan awal dan perencanaan indikatif.
