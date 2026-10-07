@@ -19,22 +19,18 @@ function HasilContent() {
   const [data, setData] = useState<AnalisisResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [paramsReady, setParamsReady] = useState(false);
+
+  // Tunggu satu siklus render supaya useSearchParams siap
+  // (return kosong di render pertama — bug Next 16 + Suspense)
+  useEffect(() => {
+    setParamsReady(true);
+  }, []);
 
   useEffect(() => {
-    // Bug fix: useSearchParams() bisa kosong di render pertama (sebelum
-    // hydration selesai). Kalau kita validasi saat kosong, user melihat
-    // "Parameter tidak valid" padahal params belum siap — bukan error
-    // nyata. Solusi: baca langsung dari URL browser.
-    const url = new URL(window.location.href);
-    const kode = url.searchParams.get('kode_bps') ?? '';
-    const anggaran = Number(url.searchParams.get('anggaran') ?? 0);
+    if (!paramsReady) return;
 
-    if (!kode || !anggaran) {
-      setError('Parameter tidak valid. Silakan ulangi dari halaman analisis.');
-      setLoading(false);
-      return;
-    }
-    if (!/^\d{10}$/.test(kode) || !(anggaran > 0)) {
+    if (!kodeBps || !/^\d{10}$/.test(kodeBps) || !(anggaranParam > 0)) {
       setError('Parameter tidak valid. Silakan ulangi dari halaman analisis.');
       setLoading(false);
       return;
@@ -47,7 +43,7 @@ function HasilContent() {
     fetch('/api/analisis', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ kode_bps: kode, anggaran }),
+      body: JSON.stringify({ kode_bps: kodeBps, anggaran: anggaranParam }),
     })
       .then(async (res) => {
         const json = await res.json();
@@ -61,8 +57,7 @@ function HasilContent() {
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [paramsReady, kodeBps, anggaranParam]);
 
   if (loading) {
     return (
