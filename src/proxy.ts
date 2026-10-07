@@ -17,7 +17,8 @@ import type { NextRequest } from 'next/server';
  */
 
 const NAMA_COOKIE = 'dl_gate';
-const RUTE_TERBUKA = ['/', '/api/gate'];
+// Halaman yang terbuka tanpa login: beranda + cakupan data + endpoint gerbang
+const RUTE_TERBUKA = ['/', '/cakupan', '/api/gate'];
 
 async function tokenValid(token: string | undefined): Promise<boolean> {
   if (!token) return false;
@@ -63,6 +64,11 @@ export async function proxy(request: NextRequest) {
   // Aset statis jangan diblokir (hero-poster, dll) — biarkan 404 alami
   // daripada redirect yang merusak.
   if (pathname.startsWith('/_next') || pathname.startsWith('/hero-poster')) {
+    return NextResponse.next();
+  }
+
+  // API cakupan terbuka untuk publik (dipakai halaman /cakupan)
+  if (pathname === '/api/cakupan') {
     return NextResponse.next();
   }
 

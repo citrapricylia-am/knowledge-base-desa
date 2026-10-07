@@ -17,7 +17,7 @@ export default function Home() {
     // Cek cookie sementara dari redirect proxy — notifikasi "perlu login"
     const match = document.cookie.match(/dl_notice=([^;]+)/);
     if (match) {
-      setNotice('Anda belum login. Masukkan email Madani Berkelanjutan untuk mengakses analisis.');
+      setNotice('Anda belum login. Silakan masuk untuk mengakses analisis.');
       // Hapus cookie supaya notifikasi tidak muncul lagi saat refresh
       document.cookie = 'dl_notice=; path=/; max-age=0';
     }
