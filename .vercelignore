@@ -1,0 +1,17 @@
+# vercel deploy dari folder lokal TIDAK membaca .gitignore.
+# Tanpa file ini CLI mengunggah 889 MB (data mentah BPS) dan gagal
+# dengan "File size limit exceeded (100 MB)".
+
+# data mentah BPS (836 MB)
+scripts/data/
+
+# video hero (9.8 MB) — dari NEXT_PUBLIC_HERO_VIDEO_URL
+public/hero-video.mp4
+
+node_modules
+.next
+.git
+*.bak
+*.bak_*
+.env*
+!.env.example
