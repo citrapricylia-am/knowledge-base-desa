@@ -150,7 +150,7 @@ const FALLBACK_KEGIATAN: Record<string, Record<Tier, string[]>> = {
   },
 };
 
-function parseRekomendasiKeys(desa: Desa): string[] {
+export function parseRekomendasiKeys(desa: Desa): string[] {
   if (desa.rekomendasi_arr?.length) {
     return desa.rekomendasi_arr.map((x) => x.trim()).filter(Boolean);
   }
@@ -308,7 +308,11 @@ export async function analyzeAnggaran(
     console.warn('[analisis] susenas fetch failed:', err);
   }
 
-  const desaData = desaToLlmData(desa);
+  // Kolom desa.estimasi_biaya di DB bisa basi (tidak ikut berubah saat
+  // rumus diperbaiki). Layar & perhitungan memakai rincianEstimasiBiaya()
+  // sebagai sumber tunggal — timpa di sini supaya narasi AI tidak
+  // menyebut angka yang berbeda dari yang dilihat pengguna.
+  const desaData = { ...desaToLlmData(desa), estimasi_biaya: estimasi };
   const { narasi, sumber } = await generateNarasi(desaData, anggaran, kegiatan, susenasData);
 
   try {
