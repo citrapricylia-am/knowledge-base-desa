@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowUpRight, XCircle } from 'lucide-react';
+import { ArrowUpRight, XCircle, Info } from 'lucide-react';
 import SmoothVideo from '@/components/SmoothVideo';
 
 export default function Home() {
@@ -11,8 +11,16 @@ export default function Home() {
   const [email, setEmail] = useState('');
   const [gateError, setGateError] = useState<string | null>(null);
   const [gateLoading, setGateLoading] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
+    // Cek cookie sementara dari redirect proxy — notifikasi "perlu login"
+    const match = document.cookie.match(/dl_notice=([^;]+)/);
+    if (match) {
+      setNotice('Anda belum login. Masukkan email Madani Berkelanjutan untuk mengakses analisis.');
+      // Hapus cookie supaya notifikasi tidak muncul lagi saat refresh
+      document.cookie = 'dl_notice=; path=/; max-age=0';
+    }
     fetch('/api/gate')
       .then((r) => setSudahMasuk(r.ok))
       .catch(() => setSudahMasuk(false));
@@ -73,6 +81,23 @@ export default function Home() {
         {/* Content centered */}
         <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 text-center">
           <div className="max-w-3xl space-y-8 animate-slide-up">
+            {/* Notifikasi: user coba akses tanpa login */}
+            {notice && (
+              <div className="mx-auto flex max-w-md items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left animate-fade-in">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                <div>
+                  <p className="text-sm font-medium text-amber-300">Akses terbatas</p>
+                  <p className="text-xs text-amber-300/70 leading-relaxed mt-0.5">{notice}</p>
+                </div>
+                <button
+                  onClick={() => setNotice(null)}
+                  className="ml-auto text-amber-400/50 hover:text-amber-400"
+                  aria-label="Tutup"
+                >
+                  ×
+                </button>
+              </div>
+            )}
             <h1 className="text-5xl font-semibold tracking-tight text-white md:text-6xl lg:text-7xl leading-[1.1]">
               Knowledge Base
               <br />

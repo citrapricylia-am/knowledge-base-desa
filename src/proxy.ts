@@ -71,10 +71,16 @@ export async function proxy(request: NextRequest) {
     return NextResponse.json({ error: 'Akses ditolak — login dulu' }, { status: 401 });
   }
 
-  // Halaman lain: tolak, kembali ke beranda dengan penanda
-  const url = new URL('/', request.url);
-  url.searchParams.set('gate', 'perlu-login');
-  return NextResponse.redirect(url);
+  // Halaman lain: tolak, kembali ke beranda.
+  // Pakai cookie sementara (bukan URL param) supaya URL tetap bersih
+  // dan user mendapat notifikasi di beranda.
+  const res = NextResponse.redirect(new URL('/', request.url));
+  res.cookies.set('dl_notice', 'perlu-login', {
+    httpOnly: false,
+    path: '/',
+    maxAge: 30, // cukup untuk halaman dimuat, lalu hilang sendiri
+  });
+  return res;
 }
 
 export const config = {

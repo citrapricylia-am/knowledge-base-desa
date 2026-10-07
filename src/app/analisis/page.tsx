@@ -20,10 +20,10 @@ export default function AnalisisPage() {
   useEffect(() => {
     fetch('/api/gate')
       .then((r) => {
-        if (!r.ok) router.push('/?gate=perlu-login');
+        if (!r.ok) router.push('/');
         else setCekSesi(false);
       })
-      .catch(() => router.push('/?gate=perlu-login'));
+      .catch(() => router.push('/'));
   }, [router]);
 
   const handleSubmit = (e: React.FormEvent) => {
