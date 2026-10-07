@@ -22,7 +22,7 @@ function HasilContent() {
 
   useEffect(() => {
     if (!/^\d{10}$/.test(kodeBps) || !(anggaranParam > 0)) {
-      setError('Parameter tidak valid. Kembali ke beranda dan isi form.');
+      setError('Parameter tidak valid. Silakan ulangi dari halaman analisis.');
       setLoading(false);
       return;
     }

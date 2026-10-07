@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
       {
         error: 'Email ditolak',
         detail:
-          'Akses hanya untuk email @madaniberkelanjutan.id. Hubungi admin bila Anda anggota Madani Berkelanjutan.',
+          'Email yang Anda masukkan tidak terdaftar. Hubungi admin bila Anda anggota tim.',
       },
       { status: 403 },
     );
