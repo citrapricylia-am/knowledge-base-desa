@@ -198,6 +198,11 @@ function HasilContent() {
           narasi={analisis.narasi}
           sumber={analisis.sumber_narasi}
           kegiatan={analisis.kegiatan}
+          analisis={analisis}
+          idm={desa.idm ?? null}
+          iks={desa.iks ?? null}
+          ike={desa.ike ?? null}
+          ikl={desa.ikl ?? null}
         />
       </div>
 

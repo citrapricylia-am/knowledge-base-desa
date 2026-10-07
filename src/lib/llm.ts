@@ -9,8 +9,8 @@ Berdasarkan data yang diberikan (Podes 2025, IDM 2024, dan Susenas 2025), tulis 
 
 STRUKTUR OUTPUT WAJIB (JSON valid, tanpa teks di luar JSON):
 {
-  "konteks": "Analisis situasi desa 8-12 kalimat. Jelaskan: posisi IDM dan apa artinya untuk desa ini, pilar IDM mana yang paling lemah dan mengapa, kondisi demografi yang menonjol (jumlah jiwa, RT, fasilitas yang ada/tidak ada), tantangan utama dari data Podes, kondisi ketahanan pangan/perumahan/air dari Susenas jika tersedia, dan kondisi lingkungan/wilayah (luas wilayah, hutan alam, lahan kritis — jika lahan kritis luas atau hutan tersisa sedikit, kaitkan langsung dengan pilar Ketahanan Lingkungan). Hubungkan data antar sumber — misal jika IKL rendah dan lahan kritis luas, jelaskan kaitannya.",
-  "posisi_anggaran": "Analisis posisi anggaran 5-8 kalimat. Jelaskan: berapa anggaran vs kebutuhan ideal, persentase cakupan, apa yang bisa dan tidak bisa dilakukan dengan anggaran ini, prioritas intervensi yang paling mendesak berdasarkan kondisi desa, dan trade-off yang perlu dipertimbangkan.",
+  "konteks": "Analisis situasi desa 5-7 kalimat. Jelaskan: posisi IDM dan pilar terlemah, kondisi demografi singkat, tantangan utama, dan kondisi lingkungan (hutan/lahan kritis) jika tersedia. Hubungkan data antar sumber secara singkat.",
+  "posisi_anggaran": "Analisis posisi anggaran 3-5 kalimat. Jelaskan: persentase cakupan, apa yang bisa/tidak bisa dibiayai, prioritas paling mendesak.",
   "rekomendasi": [
     {
       "judul": "Nama kegiatan (dari daftar yang diberikan)",

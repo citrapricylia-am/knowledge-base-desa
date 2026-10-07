@@ -116,7 +116,7 @@ export default function Home() {
                     setEmail(e.target.value);
                     if (gateError) setGateError(null);
                   }}
-                  placeholder="email@madaniberkelanjutan.id"
+                  placeholder="Masukkan email"
                   aria-label="Email untuk akses analisis"
                   disabled={gateLoading}
                   className="glass-input w-full sm:w-80 rounded-full px-5 py-3.5 text-sm text-white placeholder:text-white/30 outline-none"
@@ -159,13 +159,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Scroll indicator */}
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
-          <div className="flex flex-col items-center gap-1 text-white/40">
-            <span className="text-xs">Scroll</span>
-            <div className="h-8 w-px bg-gradient-to-b from-white/40 to-transparent" />
-          </div>
-        </div>
       </section>
     </>
   );

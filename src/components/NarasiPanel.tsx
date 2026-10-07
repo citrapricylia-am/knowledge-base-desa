@@ -1,26 +1,106 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, Sparkles, FileText } from 'lucide-react';
-import type { NarasiJson } from '@/lib/types';
+import { ChevronDown, Sparkles, FileText, TrendingUp } from 'lucide-react';
+import type { NarasiJson, AnalisisPayload } from '@/lib/types';
+import { formatPct } from '@/lib/format';
 
 interface NarasiPanelProps {
   narasi: NarasiJson;
   sumber: 'llm' | 'template' | 'cache' | string;
   kegiatan?: string[];
+  analisis?: AnalisisPayload;
+  idm?: number | null;
+  iks?: number | null;
+  ike?: number | null;
+  ikl?: number | null;
 }
 
-export default function NarasiPanel({ narasi, sumber, kegiatan }: NarasiPanelProps) {
+/**
+ * Panel analisis AI — dirancang ulang supaya tidak overwhelm:
+ *
+ * - Konteks dipisah jadi blok-blok pendek, bukan paragraf panjang
+ * - Pilar IDM divisualisasikan sebagai bar horizontal (bukan teks)
+ * - Coverage anggaran sebagai ring gauge
+ * - Rekomendasi tetap collapsible tapi dengan struktur lebih jelas
+ */
+
+function pecahParagraf(teks: string): string[] {
+  // Pecah paragraf panjang jadi kalimat-kalimat pendek
+  // supaya tidak numpuk jadi blok teks yang overwhelm.
+  const kalimat = teks.match(/[^.!?]+[.!?]+/g) ?? [teks];
+  const blok: string[] = [];
+  let current = '';
+  for (const k of kalimat) {
+    current += (current ? ' ' : '') + k.trim();
+    if (current.length > 180) {
+      blok.push(current.trim());
+      current = '';
+    }
+  }
+  if (current.trim()) blok.push(current.trim());
+  return blok.length ? blok : [teks];
+}
+
+function PilarBar({ label, value, isWeak }: { label: string; value: number | null; isWeak?: boolean }) {
+  const v = value ?? 0;
+  const pct = Math.min(100, v * 100);
+  const color = isWeak ? 'bg-rose-500' : v >= 0.71 ? 'bg-emerald-500' : v >= 0.6 ? 'bg-amber-500' : 'bg-rose-500';
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between items-baseline">
+        <span className="text-xs text-white/50">{label}</span>
+        <span className={`text-xs font-medium tabular-nums ${isWeak ? 'text-rose-400' : 'text-white/70'}`}>
+          {value?.toFixed(4) ?? '—'}
+        </span>
+      </div>
+      <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+        <div className={`h-full rounded-full ${color} transition-all duration-500`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function CoverageRing({ pct }: { pct: number }) {
+  const radius = 28;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (Math.min(100, pct) / 100) * circumference;
+  const color = pct >= 50 ? '#10b981' : pct >= 20 ? '#f59e0b' : '#ef4444';
+  return (
+    <div className="relative w-20 h-20 shrink-0">
+      <svg className="w-full h-full -rotate-90" viewBox="0 0 70 70">
+        <circle cx="35" cy="35" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="5" />
+        <circle
+          cx="35" cy="35" r={radius} fill="none" stroke={color} strokeWidth="5"
+          strokeDasharray={circumference} strokeDashoffset={offset}
+          strokeLinecap="round" className="transition-all duration-700"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-sm font-bold text-white tabular-nums">{pct.toFixed(0)}%</span>
+        <span className="text-[9px] text-white/40">cakupan</span>
+      </div>
+    </div>
+  );
+}
+
+export default function NarasiPanel({ narasi, sumber, kegiatan, idm, iks, ike, ikl, analisis }: NarasiPanelProps) {
   const [openIdx, setOpenIdx] = useState<number | null>(0);
 
   const badge =
     sumber === 'llm'
       ? { label: 'Analisis AI', className: 'bg-violet-500/10 text-violet-300 border-violet-500/20', Icon: Sparkles }
       : sumber === 'cache'
-        ? { label: 'Analisis AI (cache)', className: 'bg-sky-500/10 text-sky-300 border-sky-500/20', Icon: FileText }
+        ? { label: 'Analisis AI', className: 'bg-sky-500/10 text-sky-300 border-sky-500/20', Icon: FileText }
         : { label: 'Template', className: 'bg-white/5 text-white/40 border-white/10', Icon: FileText };
 
   const Icon = badge.Icon;
+  const konteksBlok = pecahParagraf(narasi.konteks);
+  const posisiBlok = pecahParagraf(narasi.posisi_anggaran);
+  const coverage = analisis?.coverage_pct ?? 0;
+  const pilarTerlemah = iks != null && ike != null && ikl != null
+    ? [{ v: iks, l: 'Sosial' }, { v: ike, l: 'Ekonomi' }, { v: ikl, l: 'Lingkungan' }].sort((a, b) => a.v - b.v)[0]
+    : null;
 
   return (
     <div className="space-y-4">
@@ -32,17 +112,57 @@ export default function NarasiPanel({ narasi, sumber, kegiatan }: NarasiPanelPro
         </span>
       </div>
 
-      <div className="rounded-xl border border-white/5 bg-white/[0.03] p-5 space-y-4">
-        <section>
-          <h4 className="text-xs uppercase tracking-wide text-white/50 mb-1.5">Konteks desa</h4>
-          <p className="text-white/80 leading-relaxed text-sm">{narasi.konteks}</p>
-        </section>
-        <section>
-          <h4 className="text-xs uppercase tracking-wide text-white/50 mb-1.5">Posisi anggaran</h4>
-          <p className="text-white/80 leading-relaxed text-sm">{narasi.posisi_anggaran}</p>
-        </section>
+      {/* === RINGKASAN VISUAL === */}
+      {(idm != null || coverage > 0) && (
+        <div className="grid grid-cols-2 gap-3">
+          {/* Pilar IDM */}
+          {iks != null && ike != null && ikl != null && (
+            <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4 space-y-2.5">
+              <div className="flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5 text-white/40" />
+                <span className="text-xs uppercase tracking-wide text-white/50">Pilar IDM</span>
+              </div>
+              <PilarBar label="Sosial" value={iks} isWeak={pilarTerlemah?.l === 'Sosial'} />
+              <PilarBar label="Ekonomi" value={ike} isWeak={pilarTerlemah?.l === 'Ekonomi'} />
+              <PilarBar label="Lingkungan" value={ikl} isWeak={pilarTerlemah?.l === 'Lingkungan'} />
+            </div>
+          )}
+
+          {/* Coverage anggaran */}
+          {coverage > 0 && (
+            <div className="rounded-xl border border-white/5 bg-white/[0.03] p-4 flex items-center gap-4">
+              <CoverageRing pct={coverage} />
+              <div className="space-y-0.5">
+                <div className="text-xs uppercase tracking-wide text-white/50">Anggaran</div>
+                <div className="text-sm text-white/70 leading-tight">
+                  {formatPct(coverage)} dari kebutuhan ideal
+                </div>
+                <div className="text-xs text-white/40">
+                  {coverage >= 50 ? 'Mencukupi sebagian besar' : coverage >= 20 ? 'Cukup untuk non-fisik' : 'Sangat terbatas'}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* === KONTEKS DESA === */}
+      <div className="rounded-xl border border-white/5 bg-white/[0.03] p-5 space-y-3">
+        <h4 className="text-xs uppercase tracking-wide text-white/50">Konteks desa</h4>
+        {konteksBlok.map((blok, i) => (
+          <p key={i} className="text-white/75 leading-relaxed text-sm">{blok}</p>
+        ))}
       </div>
 
+      {/* === POSISI ANGGARAN === */}
+      <div className="rounded-xl border border-white/5 bg-white/[0.03] p-5 space-y-3">
+        <h4 className="text-xs uppercase tracking-wide text-white/50">Posisi anggaran</h4>
+        {posisiBlok.map((blok, i) => (
+          <p key={i} className="text-white/75 leading-relaxed text-sm">{blok}</p>
+        ))}
+      </div>
+
+      {/* === REKOMENDASI === */}
       <div className="space-y-2">
         <h4 className="text-sm font-medium text-white/70">Rekomendasi kegiatan</h4>
         {narasi.rekomendasi.map((item, idx) => {
@@ -59,15 +179,15 @@ export default function NarasiPanel({ narasi, sumber, kegiatan }: NarasiPanelPro
               >
                 <span className="font-medium text-white text-sm">{item.judul}</span>
                 <ChevronDown
-                  className={`w-4 h-4 text-white/40 transition-transform ${open ? 'rotate-180' : ''}`}
+                  className={`w-4 h-4 text-white/40 transition-transform shrink-0 ${open ? 'rotate-180' : ''}`}
                 />
               </button>
               {open && (
-                <ul className="px-4 pb-4 space-y-2 border-t border-white/5 pt-3">
+                <ul className="px-4 pb-4 space-y-2.5 border-t border-white/5 pt-3">
                   {item.poin.map((p, i) => (
-                    <li key={i} className="text-sm text-white/60 flex gap-2">
-                      <span className="text-white/90 mt-0.5">•</span>
-                      <span>{p}</span>
+                    <li key={i} className="text-sm text-white/60 flex gap-2.5">
+                      <span className="text-white/30 mt-0.5 shrink-0">•</span>
+                      <span className="leading-relaxed">{p}</span>
                     </li>
                   ))}
                 </ul>
@@ -78,12 +198,12 @@ export default function NarasiPanel({ narasi, sumber, kegiatan }: NarasiPanelPro
       </div>
 
       {kegiatan && kegiatan.length > 0 && (
-        <p className="text-xs text-white/40">
-          Matriks kegiatan deterministik: {kegiatan.length} item untuk tier ini.
+        <p className="text-xs text-white/30">
+          Matriks kegiatan: {kegiatan.length} item untuk tier ini.
         </p>
       )}
 
-      <p className="text-xs text-white/40 border-t border-white/5 pt-3 leading-relaxed">
+      <p className="text-xs text-white/30 border-t border-white/5 pt-3 leading-relaxed">
         {narasi.disclaimer}
       </p>
     </div>
