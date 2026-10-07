@@ -1,23 +1,12 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowUpRight, ArrowRight, XCircle } from 'lucide-react';
-import SearchDesa from '@/components/SearchDesa';
-import AnggaranInput from '@/components/AnggaranInput';
+import { ArrowUpRight, XCircle } from 'lucide-react';
 import SmoothVideo from '@/components/SmoothVideo';
-import type { DesaSearchResult } from '@/lib/types';
 
 export default function Home() {
   const router = useRouter();
-  const [selectedDesa, setSelectedDesa] = useState<DesaSearchResult | null>(null);
-  const [anggaran, setAnggaran] = useState(0);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const formRef = useRef<HTMLDivElement>(null);
-
-  // === Gerbang email @madaniberkelanjutan.id ===
   const [sudahMasuk, setSudahMasuk] = useState<boolean | null>(null);
   const [email, setEmail] = useState('');
   const [gateError, setGateError] = useState<string | null>(null);
@@ -28,6 +17,13 @@ export default function Home() {
       .then((r) => setSudahMasuk(r.ok))
       .catch(() => setSudahMasuk(false));
   }, []);
+
+  // Kalau sudah punya sesi valid, langsung lempar ke halaman analisis
+  useEffect(() => {
+    if (sudahMasuk === true) {
+      router.push('/analisis');
+    }
+  }, [sudahMasuk, router]);
 
   async function masuk(e: React.FormEvent) {
     e.preventDefault();
@@ -44,8 +40,8 @@ export default function Home() {
         body: JSON.stringify({ email }),
       });
       if (res.ok) {
-        setSudahMasuk(true);
-        setEmail('');
+        // Login berhasil — pindah ke halaman analisis
+        router.push('/analisis');
       } else {
         const j = await res.json().catch(() => ({}));
         setGateError(j.detail ?? j.error ?? 'Email ditolak');
@@ -56,27 +52,6 @@ export default function Home() {
       setGateLoading(false);
     }
   }
-
-  function scrollToForm() {
-    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    if (!selectedDesa) {
-      setError('Pilih desa dari hasil pencarian.');
-      return;
-    }
-    if (anggaran <= 0) {
-      setError('Masukkan anggaran lebih dari 0.');
-      return;
-    }
-    setIsSubmitting(true);
-    router.push(
-      `/hasil?kode_bps=${selectedDesa.kode_bps}&anggaran=${anggaran}`,
-    );
-  };
 
   return (
     <>
@@ -110,6 +85,14 @@ export default function Home() {
               rekomendasi yang dapat diaudit.
             </p>
 
+            <p className="mx-auto max-w-lg text-sm text-white/45 leading-relaxed">
+              Analisis menyatukan tiga sumber resmi — potensi desa (Podes 2025),
+              Indeks Desa Membangun (IDM 2024), dan kondisi rumah tangga
+              (Susenas 2025) — lalu disusun ulang oleh AI menjadi rekomendasi
+              kegiatan yang bisa diukur. Masukkan email Madani Berkelanjutan
+              di bawah untuk membuka akses.
+            </p>
+
             {/* Stats — clean horizontal row */}
             <div className="flex flex-wrap items-center justify-center gap-6 text-white/80">
               <div className="flex flex-col">
@@ -128,7 +111,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Gerbang + Aero Hero pill button */}
+            {/* Gerbang email + Aero Hero pill button */}
             <div className="space-y-4">
               <form
                 onSubmit={masuk}
@@ -143,20 +126,20 @@ export default function Home() {
                   }}
                   placeholder="email@madaniberkelanjutan.id"
                   aria-label="Email untuk akses analisis"
-                  disabled={sudahMasuk === true}
-                  className="glass-input w-full sm:w-80 rounded-full px-5 py-3.5 text-sm text-white placeholder:text-white/30 outline-none disabled:opacity-40"
+                  disabled={gateLoading}
+                  className="glass-input w-full sm:w-80 rounded-full px-5 py-3.5 text-sm text-white placeholder:text-white/30 outline-none"
                 />
                 <button
                   type="submit"
-                  disabled={gateLoading || sudahMasuk === true}
+                  disabled={gateLoading}
                   className="group aero-pill flex cursor-pointer items-center justify-center gap-0 rounded-full border-none bg-transparent px-0 py-5 font-normal shadow-none hover:bg-transparent disabled:cursor-not-allowed"
                 >
                   <span
                     className={`aero-pill-bg rounded-full px-7 py-3.5 text-base font-medium ${
-                      gateLoading || sudahMasuk === true ? 'opacity-50' : ''
+                      gateLoading ? 'opacity-50' : ''
                     }`}
                   >
-                    {gateLoading ? 'Memeriksa…' : sudahMasuk === true ? 'Sudah masuk' : 'Mulai Analisis'}
+                    {gateLoading ? 'Memeriksa…' : 'Mulai Analisis'}
                   </span>
                   <div className="aero-pill-bg relative flex h-fit cursor-pointer items-center overflow-hidden rounded-full p-5">
                     <ArrowUpRight className="arrow-slide-in absolute h-5 w-5" />
@@ -190,104 +173,6 @@ export default function Home() {
             <span className="text-xs">Scroll</span>
             <div className="h-8 w-px bg-gradient-to-b from-white/40 to-transparent" />
           </div>
-        </div>
-      </section>
-
-      {/* ===== FORM SECTION ===== */}
-      <section ref={formRef} className="py-20 md:py-28">
-        <div className="mx-auto max-w-2xl px-4">
-          <div className="mb-10 space-y-3">
-            <h2 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
-              Pilih desa & masukkan anggaran
-            </h2>
-            <p className="text-white/50 text-base">
-              Cari desa/kelurahan, tentukan anggaran intervensi, lalu jalankan analisis.
-            </p>
-          </div>
-
-          {sudahMasuk === null ? (
-            <div className="glass-card rounded-3xl p-8 text-center text-white/40">
-              Memeriksa sesi login…
-            </div>
-          ) : sudahMasuk === false ? (
-            <div className="glass-card rounded-3xl p-8 space-y-3 text-center">
-              <p className="text-white/70 font-medium">
-                Form analisis hanya untuk anggota Madani Berkelanjutan
-              </p>
-              <p className="text-white/40 text-sm">
-                Masukkan email @madaniberkelanjutan.id di kolom paling atas
-                untuk membuka akses.
-              </p>
-              <button
-                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                className="text-sm text-white/60 underline underline-offset-4 hover:text-white transition-colors"
-              >
-                Kembali ke form login
-              </button>
-            </div>
-          ) : (
-            <div className="glass-card rounded-3xl p-6 md:p-8">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-white/70 ml-1">
-                  Pilih desa / kelurahan
-                </label>
-                <SearchDesa onSelect={setSelectedDesa} selected={selectedDesa} />
-                {selectedDesa && (
-                  <p className="text-xs text-white/40 ml-1">
-                    Terpilih: {selectedDesa.nama_desa} · BPS {selectedDesa.kode_bps}
-                    {' · '}
-                    <Link
-                      href={`/desa/${selectedDesa.kode_bps}`}
-                      className="underline underline-offset-2 hover:text-white"
-                    >
-                      lihat profil
-                    </Link>
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-white/70 ml-1">
-                  Rencana anggaran intervensi
-                </label>
-                <AnggaranInput value={anggaran} onChange={setAnggaran} />
-              </div>
-
-              {error && (
-                <p className="text-sm text-rose-300 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
-                  {error}
-                </p>
-              )}
-
-              <button
-                type="submit"
-                disabled={!selectedDesa || anggaran <= 0 || isSubmitting}
-                className={`w-full py-4 rounded-xl font-semibold text-base transition-all duration-300 flex items-center justify-center gap-2 ${
-                  !selectedDesa || anggaran <= 0 || isSubmitting
-                    ? 'bg-white/5 text-white/20 cursor-not-allowed border border-white/5'
-                    : 'bg-white text-black hover:bg-white/90 hover:scale-[1.01] shadow-lg'
-                }`}
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                    Membuka analisis…
-                  </>
-                ) : (
-                  <>
-                    Analisis potensi
-                    <ArrowRight className="w-5 h-5" />
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
-          )}
-
-          <p className="mt-6 text-center text-xs text-white/30 leading-relaxed">
-            Sumber: Podes 2025 · IDM 2024 · BPS Indonesia. Bukan nasihat investasi — untuk penyaringan awal dan perencanaan indikatif.
-          </p>
         </div>
       </section>
     </>
