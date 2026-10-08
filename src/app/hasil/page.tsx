@@ -7,7 +7,6 @@ import { ArrowLeft, AlertTriangle, Calculator, Printer } from 'lucide-react';
 import ProfilDesaPanel from '@/components/ProfilDesaPanel';
 import NarasiPanel from '@/components/NarasiPanel';
 import TanyaAnalisis from '@/components/TanyaAnalisis';
-import SandboxAnggaran from '@/components/SandboxAnggaran';
 import { TombolBagikan } from '@/components/TombolBagikan';
 import type { AnalisisResponse } from '@/lib/types';
 import { formatPct, formatRp, podesColor, podesLabel, statusIdmColor, tierColor, tierLabel, tierDesc } from '@/lib/format';
@@ -256,15 +255,6 @@ function HasilContent() {
           ikl={desa.ikl ?? null}
           sedangMenyusun={narasiLoading}
           gagalMenyusun={narasiError}
-        />
-      </div>
-
-      {/* Sandbox: coba skenario anggaran lain */}
-      <div className="glass-card rounded-3xl p-5 md:p-6 print-hide">
-        <SandboxAnggaran
-          kodeBps={kodeBps}
-          anggaranAsli={anggaranParam}
-          kebutuhanIdeal={Number(analisis.estimasi_biaya_ideal)}
         />
       </div>
 

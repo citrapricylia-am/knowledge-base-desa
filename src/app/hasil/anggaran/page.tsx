@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Calculator, Printer } from 'lucide-react';
 import type { AnalisisResponse } from '@/lib/types';
 import { TombolBagikan } from '@/components/TombolBagikan';
+import SandboxAnggaran from '@/components/SandboxAnggaran';
 import { formatPct } from '@/lib/format';
 
 function AnggaranContent() {
@@ -27,7 +28,9 @@ function AnggaranContent() {
     fetch('/api/analisis', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ kode_bps: kodeBps, anggaran: anggaranParam }),
+      // Halaman ini hanya butuh angka, bukan narasi AI.
+      // cepat:true melewati LLM (30 detik -> 0,3 detik).
+      body: JSON.stringify({ kode_bps: kodeBps, anggaran: anggaranParam, cepat: true }),
     })
       .then(async (res) => res.json())
       .then((json) => { if (!cancelled) setData(json); })
@@ -186,6 +189,15 @@ function AnggaranContent() {
             <div className="h-full rounded-full bg-white" style={{ width: `${Math.min(100, Math.max(0, analisis.coverage_pct))}%` }} />
           </div>
         </div>
+      </div>
+
+      {/* Sandbox: coba skenario anggaran lain */}
+      <div className="glass-card rounded-3xl p-5 md:p-6 print-hide">
+        <SandboxAnggaran
+          kodeBps={kodeBps}
+          anggaranAsli={anggaranParam}
+          kebutuhanIdeal={Number(analisis.estimasi_biaya_ideal)}
+        />
       </div>
 
       <p className="text-xs text-white/25 leading-relaxed">

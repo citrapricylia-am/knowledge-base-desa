@@ -225,7 +225,7 @@ export default function SandboxAnggaran({
       )}
 
       <p className="text-xs text-white/25 leading-relaxed">
-        Narasi AI di atas tetap mengacu pada anggaran semula
+        Rincian di atas dan hasil analisis tetap memakai anggaran semula
         ({formatRp(anggaranAsli)}). Untuk analisis penuh pada angka baru,
         jalankan analisis ulang dari halaman analisis.
       </p>
