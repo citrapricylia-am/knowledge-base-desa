@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "uji": "tsx scripts/uji_estimasi.ts"
+    "uji": "npx tsx scripts/uji_estimasi.ts && npx tsx scripts/uji_json_terpotong.ts && npx tsx scripts/uji_pecah_paragraf.ts && npx tsx scripts/uji_konsistensi_angka.ts && npx tsx scripts/uji_sandbox.ts"
   },
   "dependencies": {
     "lucide-react": "^1.28.0",
