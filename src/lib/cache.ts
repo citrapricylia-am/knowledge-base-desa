@@ -6,7 +6,11 @@ import type { NarasiJson } from './types';
 export function buildCacheHash(kodeBps: string, anggaran: number): string {
   // Bucket anggaran ke 1jt agar cache tidak meledak per rupiah
   const bucket = Math.round(anggaran / 1_000_000) * 1_000_000;
-  return createHash('sha256').update(`${kodeBps}:${bucket}`).digest('hex');
+  // VERSI dinaikkan tiap kali format/prompt narasi berubah — baris lama
+  // di narasi_cache otomatis tidak kena dan narasi dibuat ulang.
+  // v2: angka desimal pakai koma (id-ID), bukan titik.
+  const VERSI = 'v2';
+  return createHash('sha256').update(`${kodeBps}:${bucket}:${VERSI}`).digest('hex');
 }
 
 export async function getCachedNarasi(
