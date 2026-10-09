@@ -127,9 +127,13 @@ export function buildUserPrompt(
     if (n == null) return 'Data tidak tersedia';
     const num = Number(n);
     if (Number.isNaN(num)) return 'Data tidak tersedia';
-    return num.toFixed(d);
+    // Format Indonesia (koma desimal) — LLM menyalin angka apa adanya
+    // dari prompt, jadi titik di sini akan muncul di narasi di layar.
+    return num.toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d });
   };
   const rp = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
+  const pct1 = (n: number) =>
+    n.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
   let prompt = `DATA DESA:
 - Nama: ${desa.nama_desa}, Kec. ${desa.nama_kecamatan}, Kab. ${desa.nama_kabupaten}
@@ -144,9 +148,9 @@ export function buildUserPrompt(
 - Estimasi kebutuhan ideal: ${rp(desa.estimasi_biaya)}
 LINGKUNGAN & WILAYAH (Podes 2025):
 - Luas wilayah: ${desa.luas_wilayah_ha != null ? fmt(desa.luas_wilayah_ha, 1) + ' ha' : 'Data tidak tersedia'}
-- Hutan alam: ${desa.hutan_alam_ha != null ? fmt(desa.hutan_alam_ha, 1) + ' ha' + (desa.luas_wilayah_ha ? ` (${((Number(desa.hutan_alam_ha) / Number(desa.luas_wilayah_ha)) * 100).toFixed(1)}% dari wilayah)` : '') : 'Data tidak tersedia'}
-- Lahan kritis: ${desa.lahan_kritis_ha != null ? fmt(desa.lahan_kritis_ha, 1) + ' ha' + (desa.luas_wilayah_ha ? ` (${((Number(desa.lahan_kritis_ha) / Number(desa.luas_wilayah_ha)) * 100).toFixed(1)}% dari wilayah)` : '') : 'Data tidak tersedia'} | Status: ${desa.lahan_kritis_status ?? 'Data tidak tersedia'}
-ANGGARAN INTERVENSI: ${rp(anggaran)} (${coverage.toFixed(1)}% dari kebutuhan ideal)
+- Hutan alam: ${desa.hutan_alam_ha != null ? fmt(desa.hutan_alam_ha, 1) + ' ha' + (desa.luas_wilayah_ha ? ` (${pct1((Number(desa.hutan_alam_ha) / Number(desa.luas_wilayah_ha)) * 100)}% dari wilayah)` : '') : 'Data tidak tersedia'}
+- Lahan kritis: ${desa.lahan_kritis_ha != null ? fmt(desa.lahan_kritis_ha, 1) + ' ha' + (desa.luas_wilayah_ha ? ` (${pct1((Number(desa.lahan_kritis_ha) / Number(desa.luas_wilayah_ha)) * 100)}% dari wilayah)` : '') : 'Data tidak tersedia'} | Status: ${desa.lahan_kritis_status ?? 'Data tidak tersedia'}
+ANGGARAN INTERVENSI: ${rp(anggaran)} (${pct1(coverage)}% dari kebutuhan ideal)
 KEGIATAN YANG DIREKOMENDASIKAN:
 ${kegiatan.map((k) => `- ${k}`).join('\n')}`;
 
@@ -227,12 +231,12 @@ export function buildTemplateNarasi(
     konteks:
       `${desa.nama_desa} di Kecamatan ${desa.nama_kecamatan}, ` +
       `Kabupaten ${desa.nama_kabupaten} berstatus ${desa.status_idm_computed ?? 'tidak diketahui'} ` +
-      `dengan IDM 2024 sebesar ${desa.idm?.toFixed(4) ?? 'tidak tersedia'}. ` +
+      `dengan IDM 2024 sebesar ${desa.idm != null ? Number(desa.idm).toLocaleString('id-ID', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : 'tidak tersedia'}. ` +
       `Desa ini memiliki ${desa.jumlah_jiwa?.toLocaleString('id-ID') ?? '?'} jiwa ` +
       `(${desa.jumlah_rt?.toLocaleString('id-ID') ?? '?'} rumah tangga). ` +
       `Tantangan utama yang teridentifikasi: ${desa.tantangan ?? 'tidak tersedia'}.`,
     posisi_anggaran:
-      `Dengan anggaran ${rp(anggaran)} (${coverage.toFixed(1)}% dari estimasi kebutuhan ideal ` +
+      `Dengan anggaran ${rp(anggaran)} (${coverage.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% dari estimasi kebutuhan ideal ` +
       `${rp(desa.estimasi_biaya)}), alokasi ini ${TIER_LABEL[tier]}.`,
     rekomendasi: kegiatan.map((k) => ({
       judul: k,
