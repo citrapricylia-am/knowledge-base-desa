@@ -85,7 +85,7 @@ function fmtPct(n: number | string | null | undefined): string {
   if (n == null) return '—';
   const num = Number(n);
   if (Number.isNaN(num)) return '—';
-  return `${num.toFixed(1)}%`;
+  return `${num.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
 
 function fmtNum(n: number | string | null | undefined, d = 0): string {
@@ -363,7 +363,7 @@ export default function ProfilDesaPanel({
             <Row label="Luas lahan kritis" value={`${fmtNum(toNum(desa.lahan_kritis_ha), 2)} ha`} />
           )}
           {desa.podes2025_lat != null && desa.podes2025_lon != null && (
-            <Row label="Koordinat" value={`${fmtNum(toNum(desa.podes2025_lat), 4)}, ${fmtNum(toNum(desa.podes2025_lon), 4)}`} />
+            <Row label="Koordinat" value={`${toNum(desa.podes2025_lat)?.toFixed(4) ?? '—'}, ${toNum(desa.podes2025_lon)?.toFixed(4) ?? '—'}`} />
           )}
         </div>
       </div>
@@ -581,7 +581,7 @@ function IDMBar({ label, value, color, desc }: {
         <span className="text-white/50 font-medium">{label}</span>
         <div className="flex items-center gap-1.5">
           <span className={`w-1.5 h-1.5 rounded-full ${statusDot[st]}`} />
-          <span className="text-white/80 tabular-nums font-medium">{value != null ? value.toFixed(4) : '—'}</span>
+          <span className="text-white/80 tabular-nums font-medium">{value != null ? value.toLocaleString('id-ID', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '—'}</span>
         </div>
       </div>
       <div className="h-2 rounded-full bg-white/5 overflow-hidden">

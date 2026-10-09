@@ -81,7 +81,7 @@ function PilarBar({ label, value, isWeak }: { label: string; value: number | str
       <div className="flex justify-between items-baseline">
         <span className="text-xs text-white/50">{label}</span>
         <span className={`text-xs font-medium tabular-nums ${isWeak ? 'text-rose-400' : 'text-white/70'}`}>
-          {num != null && Number.isFinite(num) ? num.toFixed(4) : '—'}
+          {num != null && Number.isFinite(num) ? num.toLocaleString('id-ID', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '—'}
         </span>
       </div>
       <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">

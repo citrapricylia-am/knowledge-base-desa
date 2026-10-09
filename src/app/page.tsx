@@ -26,16 +26,17 @@ export default function Home() {
       .catch(() => setSudahMasuk(false));
   }, []);
 
-  // Kalau sudah punya sesi valid, langsung lempar ke halaman analisis
-  useEffect(() => {
-    if (sudahMasuk === true) {
-      router.push('/analisis');
-    }
-  }, [sudahMasuk, router]);
+  // Sesi aktif TIDAK auto-redirect: hero tetap terlihat, tombol berubah
+  // jadi "Lanjutkan" supaya user tahu dia sudah login (bukan terlempar
+  // ke form tanpa penjelasan).
 
   async function masuk(e: React.FormEvent) {
     e.preventDefault();
     setGateError(null);
+    if (sudahMasuk) {
+      router.push('/analisis');
+      return;
+    }
     if (!email.trim()) {
       setGateError('Masukkan email Anda dulu.');
       return;
@@ -144,7 +145,9 @@ export default function Home() {
                   placeholder="Masukkan email"
                   aria-label="Email untuk akses analisis"
                   disabled={gateLoading}
-                  className="glass-input w-full sm:w-80 rounded-full px-5 py-3.5 text-sm text-white placeholder:text-white/30 outline-none"
+                  className={`glass-input w-full sm:w-80 rounded-full px-5 py-3.5 text-sm text-white placeholder:text-white/30 outline-none ${
+                    sudahMasuk ? 'hidden' : ''
+                  }`}
                 />
                 <button
                   type="submit"
@@ -156,7 +159,11 @@ export default function Home() {
                       gateLoading ? 'opacity-50' : ''
                     }`}
                   >
-                    {gateLoading ? 'Memeriksa…' : 'Mulai Analisis'}
+                    {gateLoading
+                      ? 'Memeriksa…'
+                      : sudahMasuk
+                        ? 'Lanjutkan Analisis'
+                        : 'Mulai Analisis'}
                   </span>
                   <div className="aero-pill-bg relative flex h-fit cursor-pointer items-center overflow-hidden rounded-full p-5">
                     <ArrowUpRight className="arrow-slide-in absolute h-5 w-5" />

@@ -15,7 +15,7 @@ export function formatNumber(n: number | null | undefined, digits = 0): string {
 
 export function formatPct(n: number | null | undefined, digits = 1): string {
   if (n === null || n === undefined || Number.isNaN(Number(n))) return '—';
-  return `${Number(n).toFixed(digits)}%`;
+  return `${formatNumber(Number(n), digits)}%`;
 }
 
 export function desaFullName(parts: {

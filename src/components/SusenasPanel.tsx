@@ -44,14 +44,14 @@ function fmtPct(n: number | string | null | undefined): string {
   if (n == null) return '—';
   const num = Number(n);
   if (Number.isNaN(num)) return '—';
-  return `${num.toFixed(1)}%`;
+  return `${num.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
 
 function fmtNum(n: number | string | null | undefined, d = 1): string {
   if (n == null) return '—';
   const num = Number(n);
   if (Number.isNaN(num)) return '—';
-  return num.toFixed(d);
+  return num.toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
 function StatRow({ label, value, warn }: { label: string; value: string; warn?: boolean }) {

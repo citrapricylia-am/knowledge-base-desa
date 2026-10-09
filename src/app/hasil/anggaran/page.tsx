@@ -123,12 +123,12 @@ function AnggaranContent() {
         <div className="grid grid-cols-2 gap-4 pt-2">
           <div className="rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3">
             <div className="text-[10px] uppercase tracking-wide text-white/30">Multiplier IDM</div>
-            <div className="text-lg font-bold text-white">×{r.idmMultiplier.toFixed(1)}</div>
+            <div className="text-lg font-bold text-white">×{r.idmMultiplier.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</div>
             <p className="text-[10px] text-white/25 mt-0.5">{r.idmLabel}</p>
           </div>
           <div className="rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3">
             <div className="text-[10px] uppercase tracking-wide text-white/30">Multiplier Podes</div>
-            <div className="text-lg font-bold text-white">×{r.podesMultiplier.toFixed(1)}</div>
+            <div className="text-lg font-bold text-white">×{r.podesMultiplier.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</div>
             <p className="text-[10px] text-white/25 mt-0.5">{r.podesLabel}</p>
           </div>
         </div>
@@ -137,7 +137,7 @@ function AnggaranContent() {
         <div className="space-y-1 pt-2 border-t border-white/5">
           <div className="flex items-center justify-between">
             <span className="text-xs text-white/40">
-              Setelah multiplier (×{(r.idmMultiplier * r.podesMultiplier).toFixed(2)})
+              Setelah multiplier (×{(r.idmMultiplier * r.podesMultiplier).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
             </span>
             <span className="text-xs text-white/60 tabular-nums">{fmt(setelahMultiplier)}</span>
           </div>
