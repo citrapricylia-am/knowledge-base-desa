@@ -4,6 +4,7 @@ import { rincianEstimasiBiaya, parseRekomendasiKeys, resolveKegiatan } from '@/l
 import { getCachedNarasi } from '@/lib/cache';
 import type { Desa } from '@/lib/types';
 import { NextResponse } from 'next/server';
+import { ipPemanggil, cekKuota, balasanTerlaluSering } from '@/lib/batas';
 
 export const runtime = 'nodejs';
 
@@ -22,6 +23,10 @@ ATURAN WAJIB:
 const MAKS_RIWAYAT = 8;
 
 export async function POST(request: Request) {
+  // Rate limit: chat juga memanggil LLM. 30 pesan per IP per 10 menit.
+  const tunggu = cekKuota(`chat:${ipPemanggil(request)}`, 30, 600);
+  if (tunggu !== null) return balasanTerlaluSering(tunggu);
+
   try {
     const body = (await request.json()) as {
       kode_bps?: string;

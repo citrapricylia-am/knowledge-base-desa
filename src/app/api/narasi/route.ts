@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { queryOne } from '@/lib/db';
 import { analyzeAnggaran } from '@/lib/analisis';
 import type { Desa } from '@/lib/types';
+import { ipPemanggil, cekKuota, balasanTerlaluSering } from '@/lib/batas';
 
 export const runtime = 'nodejs';
 
@@ -16,6 +17,11 @@ export const runtime = 'nodejs';
  * jadi kunjungan berikutnya untuk desa+anggaran yang sama langsung instan.
  */
 export async function POST(request: Request) {
+  // Rate limit: tiap panggilan = satu permintaan ke LLM yang dibayar.
+  // 20 narasi per IP per 10 menit cukup untuk pemakaian wajar.
+  const tunggu = cekKuota(`narasi:${ipPemanggil(request)}`, 20, 600);
+  if (tunggu !== null) return balasanTerlaluSering(tunggu);
+
   try {
     const body = (await request.json()) as {
       kode_bps?: string;

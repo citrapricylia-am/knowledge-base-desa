@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  emailDiizinkan,
+  ipPemanggil,
+  cekKuota,
+  balasanTerlaluSering,
+} from '@/lib/batas';
 
 /**
  * Gerbang akses DesaLens.
@@ -12,7 +18,6 @@ import { NextRequest, NextResponse } from 'next/server';
  * Sesi: token HMAC signed cookie, httpOnly, 30 hari.
  */
 
-const DOMAIN_DIIZINKAN = 'madaniberkelanjutan.id';
 const NAMA_COOKIE = 'dl_gate';
 const MASA_SESI_DETIK = 60 * 60 * 24 * 30; // 30 hari
 
@@ -64,18 +69,12 @@ async function tokenValid(token: string | undefined): Promise<boolean> {
   return Number.isFinite(kedaluwarsa) && Date.now() < kedaluwarsa;
 }
 
-function emailValidDanDiizinkan(raw: string): string | null {
-  const email = raw.trim().toLowerCase();
-  // Validasi format sederhana tanpa regex berat
-  if (!email.includes('@') || email.length < 6 || email.length > 254) return null;
-  const [local, domain] = email.split('@');
-  if (!local || !domain) return null;
-  if (!/^[a-z0-9._%+-]+$/i.test(local)) return null;
-  if (domain !== DOMAIN_DIIZINKAN) return null;
-  return email;
-}
-
 export async function POST(req: NextRequest) {
+  // Rate limit: 8 percobaan login per IP per 10 menit. Tanpa ini, email
+  // bisa ditebak beruntun tanpa hambatan.
+  const tunggu = cekKuota(`gate:${ipPemanggil(req)}`, 8, 600);
+  if (tunggu !== null) return balasanTerlaluSering(tunggu);
+
   let body: { email?: string };
   try {
     body = await req.json();
@@ -83,7 +82,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Permintaan tidak valid' }, { status: 400 });
   }
 
-  const email = emailValidDanDiizinkan(String(body.email ?? ''));
+  const email = emailDiizinkan(String(body.email ?? ''));
 
   if (!email) {
     // Jeda kecil supaya tidak bisa dipakai enumerasi email secara cepat
