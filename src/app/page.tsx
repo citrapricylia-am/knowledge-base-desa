@@ -10,6 +10,7 @@ export default function Home() {
   const [sudahMasuk, setSudahMasuk] = useState<boolean | null>(null);
   const [email, setEmail] = useState('');
   const [gateError, setGateError] = useState<string | null>(null);
+  const [gateErrorJudul, setGateErrorJudul] = useState('Email ditolak');
   const [gateLoading, setGateLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -53,6 +54,10 @@ export default function Home() {
         router.push('/analisis');
       } else {
         const j = await res.json().catch(() => ({}));
+        // 429 bukan soal emailnya — jangan bilang "Email ditolak".
+        setGateErrorJudul(
+          res.status === 429 ? 'Terlalu banyak percobaan' : 'Email ditolak',
+        );
         setGateError(j.detail ?? j.error ?? 'Email ditolak');
       }
     } catch {
@@ -180,7 +185,7 @@ export default function Home() {
                 >
                   <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
                   <div>
-                    <p className="text-sm font-medium text-rose-300">Email ditolak</p>
+                    <p className="text-sm font-medium text-rose-300">{gateErrorJudul}</p>
                     <p className="text-xs text-rose-300/70 leading-relaxed mt-0.5">
                       {gateError}
                     </p>
