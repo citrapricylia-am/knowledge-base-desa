@@ -1,23 +1,23 @@
 import { z } from 'zod';
-import type { Desa, NarasiJson, Tier } from './types';
+import type { Desa, Diagnosis, NarasiJson, Tier } from './types';
 import { translateTantangan } from './format';
 
 export const SYSTEM_PROMPT = `Kamu adalah analis kebijakan pembangunan desa senior di Kementerian Desa PDT & Transmigrasi RI dengan pengalaman 20+ tahun menangani intervensi sosial di desa tertinggal. Kamu menulis laporan analisis untuk dipakai dalam perencanaan anggaran daerah.
 
 TUGAS KAMU:
-Berdasarkan data yang diberikan (Podes 2025, IDM 2024, dan Susenas 2025), tulis analisis mendalam tentang kondisi desa dan rekomendasi kegiatan yang sesuai dengan anggaran yang dialokasikan.
+Berdasarkan data yang diberikan (Podes 2025, IDM 2024, dan Susenas 2025) dan HASIL DIAGNOSIS SISTEM (prioritas, alokasi, sasaran sudah dihitung), tulis analisis yang menjelaskan MENGAPA kondisi desa seperti itu dan BAGAIMANA anggaran sebaiknya dipakai. Pembaca adalah perencana program dan pengambil keputusan non-teknis.
 
 STRUKTUR OUTPUT WAJIB (JSON valid, tanpa teks di luar JSON):
 {
-  "konteks": "Analisis situasi desa 5-7 kalimat. Jelaskan: posisi IDM dan pilar terlemah, kondisi demografi singkat, tantangan utama, dan kondisi lingkungan (hutan/lahan kritis) jika tersedia. Hubungkan data antar sumber secara singkat.",
-  "posisi_anggaran": "Analisis posisi anggaran 3-5 kalimat. Jelaskan: persentase cakupan, apa yang bisa/tidak bisa dibiayai, prioritas paling mendesak.",
+  "konteks": "Interpretasi 4-6 kalimat: MENGAPA desa berada di kondisi ini. Jelaskan rantai sebab-akibat antar temuan (misal pendidikan rendah → pekerjaan terbatas → kemiskinan), apa yang paling menahan kemajuan, dan apa yang khas dari desa ini dibanding desa lain. JANGAN mengulang skor IDM, status, atau persentase cakupan anggaran — pengguna sudah melihatnya di kartu angka.",
+  "posisi_anggaran": "Strategi anggaran 3-4 kalimat: apa yang TIDAK bisa dibiayai dengan anggaran ini dan konsekuensinya, urutan pelaksanaan yang masuk akal, dan sumber dana pelengkap konkret untuk menutup kekurangan. JANGAN mengulang daftar alokasi per program.",
   "rekomendasi": [
     {
-      "judul": "Nama kegiatan (dari daftar yang diberikan)",
+      "judul": "Nama BIDANG persis seperti di daftar PROGRAM BERPRIORITAS (misal 'Air bersih & sanitasi')",
       "poin": [
-        "Alasan kegiatan ini diprioritaskan — kaitkan ke data spesifik (maks 2 kalimat)",
-        "Detail pelaksanaan konkret: lokasi, target penerima, metode (maks 2 kalimat)",
-        "Dampak pada pilar IDM mana dan cara mengukurnya (maks 2 kalimat)"
+        "Hal khas desa ini yang harus diperhatikan saat melaksanakan program (maks 2 kalimat)",
+        "Keterkaitan dengan program lain atau kekuatan desa yang bisa dimanfaatkan (maks 2 kalimat)",
+        "Tanda awal keberhasilan/kegagalan yang perlu dipantau di 3 bulan pertama (maks 2 kalimat)"
       ]
     }
   ],
@@ -26,11 +26,14 @@ STRUKTUR OUTPUT WAJIB (JSON valid, tanpa teks di luar JSON):
 
 ATURAN:
 1. Gunakan HANYA angka dari data yang diberikan. Dilarang mengarang angka.
-2. Setiap rekomendasi HARUS punya judul yang persis sama dengan daftar kegiatan yang diberikan.
+2. Buat SATU rekomendasi per program di daftar PROGRAM BERPRIORITAS, dengan urutan yang sama. Judul HARUS persis sama dengan nama bidang di daftar itu. Jangan mengubah alokasi rupiah atau urutan prioritas.
 3. Bahasa Indonesia formal tapi mudah dibaca — gaya laporan analisis kebijakan, bukan template.
 4. Kaitkan analisis dengan kerangka IDM secara eksplisit — tunjukkan pilar mana yang paling tertekan.
 5. Jika data Susenas tersedia, gunakan untuk memperkaya analisis (misal: "39% rumah tangga khawatir kehabisan makan, mengindikasikan tekanan pada pilar sosial").
-6. Output HANYA JSON valid. Tanpa salam, tanpa markdown, tanpa teks di luar JSON.`;
+6. Data Susenas adalah agregat KABUPATEN, bukan desa — sebut "di tingkat kabupaten" saat memakainya.
+7. Hindari kalimat generik ("libatkan masyarakat", "sesuaikan kondisi lapangan") kecuali disertai hal spesifik untuk desa ini.
+8. Langkah, indikator, mitra, dan risiko standar tiap program SUDAH ditampilkan ke pengguna — jangan diulang. Tambahkan hanya wawasan yang tidak ada di hasil diagnosis.
+9. Output HANYA JSON valid. Tanpa salam, tanpa markdown, tanpa teks di luar JSON.`;
 
 export interface DesaData {
   nama_desa: string;
@@ -120,6 +123,7 @@ export function buildUserPrompt(
   anggaran: number,
   kegiatan: string[],
   susenas?: SusenasData | null,
+  diagnosis?: Diagnosis | null,
 ): string {
   const coverage =
     desa.estimasi_biaya > 0 ? (anggaran / desa.estimasi_biaya) * 100 : 0;
@@ -184,7 +188,47 @@ PENDIDIKAN:
 - Buta huruf: ${fmt(susenas.buta_huruf_pct, 1)}%`;
   }
 
+  if (diagnosis) prompt += `\n\n${ringkasDiagnosis(diagnosis)}`;
+
   return prompt;
+}
+
+/** Hasil diagnosis deterministik dalam bentuk teks untuk prompt LLM/chat. */
+export function ringkasDiagnosis(d: Diagnosis): string {
+  const rp = (n: number) => `Rp ${Math.round(n).toLocaleString('id-ID')}`;
+  const pct = (n: number) =>
+    `${n.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+  const baris: string[] = ['HASIL DIAGNOSIS SISTEM (sudah dihitung — pakai apa adanya):'];
+  if (d.posisiIdm) baris.push(`POSISI IDM: ${d.posisiIdm.penjelasan}`);
+
+  const masalah = d.temuan.filter((t) => t.jenis === 'masalah');
+  if (masalah.length) {
+    baris.push('TEMUAN MASALAH (urut dari paling parah):');
+    for (const t of masalah) baris.push(`- [${t.tingkat}] ${t.judul}: ${t.nilai} (${t.pembanding})`);
+  }
+  const kekuatan = d.temuan.filter((t) => t.jenis === 'kekuatan');
+  if (kekuatan.length) {
+    baris.push('KEKUATAN DESA:');
+    for (const t of kekuatan) baris.push(`- ${t.judul}: ${t.nilai}`);
+  }
+  if (d.keterkaitan.length) {
+    baris.push('KETERKAITAN ANTAR-TEMUAN (sudah ditampilkan):');
+    for (const k of d.keterkaitan) baris.push(`- ${k.judul}`);
+  }
+  if (d.tidakTercakup.length) {
+    baris.push(`MASALAH SERIUS DI LUAR PAKET: ${d.tidakTercakup.join(', ')}`);
+  }
+  if (d.program.length) {
+    baris.push('PROGRAM BERPRIORITAS:');
+    for (const p of d.program) {
+      baris.push(
+        `${p.prioritas}. ${p.bidang} — alokasi ${rp(p.alokasi)} (${pct(p.porsiPct)}), urgensi ${p.urgensi}. ` +
+          `Kegiatan: ${p.kegiatan.join('; ')}. Sasaran: ${p.sasaran}.` +
+          (p.jangkauan ? ` ${p.jangkauan}` : ''),
+      );
+    }
+  }
+  return baris.join('\n');
 }
 
 const NarasiSchema = z.object({
@@ -221,11 +265,45 @@ export function buildTemplateNarasi(
   desa: DesaData,
   anggaran: number,
   kegiatan: string[],
+  diagnosis?: Diagnosis | null,
 ): NarasiJson {
   const coverage =
     desa.estimasi_biaya > 0 ? (anggaran / desa.estimasi_biaya) * 100 : 0;
   const tier = getTier(coverage);
   const rp = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
+
+  // Dengan diagnosis, template tetap spesifik untuk desa ini (bukan kalimat
+  // generik) — dipakai saat LLM mati/timeout.
+  if (diagnosis?.program.length) {
+    const pctFmt = (n: number) =>
+      `${n.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+    return {
+      konteks: [
+        `${desa.nama_desa} di Kecamatan ${desa.nama_kecamatan}, Kabupaten ${desa.nama_kabupaten} ` +
+          `memiliki ${desa.jumlah_jiwa?.toLocaleString('id-ID') ?? '?'} jiwa dalam ` +
+          `${desa.jumlah_rt?.toLocaleString('id-ID') ?? '?'} rumah tangga.`,
+        diagnosis.posisiIdm?.penjelasan ?? '',
+        ...diagnosis.keterkaitan.slice(0, 2).map((k) => k.isi),
+      ].filter(Boolean).join(' '),
+      posisi_anggaran:
+        `Anggaran ${rp(anggaran)} setara ${pctFmt(coverage)} dari estimasi kebutuhan ideal ${rp(desa.estimasi_biaya)}, ` +
+        `sehingga ${TIER_LABEL[tier]}. Alokasi disarankan: ` +
+        diagnosis.program.map((p) => `${p.bidang} ${rp(p.alokasi)} (${pctFmt(p.porsiPct)})`).join(', ') +
+        '. Urutan mengikuti tingkat keparahan masalah yang menjadi dasar tiap program.',
+      rekomendasi: diagnosis.program.map((p) => ({
+        judul: p.bidang,
+        poin: [
+          p.alasan.length ? `Dasar prioritas: ${p.alasan.join('; ')}.` : p.tujuan,
+          `Sasaran: ${p.sasaran}. Mulai dengan: ${p.langkah[0] ?? '-'}`,
+          `Ukur keberhasilan lewat: ${p.indikator[0] ?? '-'}.`,
+          p.risiko[0] ? `Risiko: ${p.risiko[0].risiko.toLowerCase()} — ${p.risiko[0].mitigasi}` : '',
+        ].filter(Boolean),
+      })),
+      disclaimer:
+        'Rekomendasi ini bersifat indikatif berdasarkan data Podes 2025 dan IDM 2024 serta asumsi biaya satuan model. ' +
+        'Validasi lapangan dan musyawarah desa tetap diperlukan sebelum pelaksanaan.',
+    };
+  }
 
   return {
     konteks:
@@ -257,6 +335,7 @@ export async function callLLM(
   anggaran: number,
   kegiatan: string[],
   susenas?: SusenasData | null,
+  diagnosis?: Diagnosis | null,
 ): Promise<NarasiJson> {
   const apiKey = process.env.LLM_API_KEY;
   if (!apiKey) {
@@ -286,7 +365,7 @@ export async function callLLM(
       ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: buildUserPrompt(desa, anggaran, kegiatan, susenas) },
+        { role: 'user', content: buildUserPrompt(desa, anggaran, kegiatan, susenas, diagnosis) },
         { role: 'assistant', content: '{' },
       ],
     }),
@@ -356,6 +435,7 @@ export async function generateNarasi(
   anggaran: number,
   kegiatan: string[],
   susenas?: SusenasData | null,
+  diagnosis?: Diagnosis | null,
 ): Promise<{ narasi: NarasiJson; sumber: 'llm' | 'template' }> {
   if (!kegiatan.length) {
     return {
@@ -381,12 +461,12 @@ export async function generateNarasi(
   }
 
   try {
-    const narasi = await callLLM(desa, anggaran, kegiatan, susenas);
+    const narasi = await callLLM(desa, anggaran, kegiatan, susenas, diagnosis);
     return { narasi, sumber: 'llm' };
   } catch (err) {
     console.warn('[llm] fallback template:', err instanceof Error ? err.message : err);
     return {
-      narasi: buildTemplateNarasi(desa, anggaran, kegiatan),
+      narasi: buildTemplateNarasi(desa, anggaran, kegiatan, diagnosis),
       sumber: 'template',
     };
   }

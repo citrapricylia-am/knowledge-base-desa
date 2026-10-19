@@ -1,7 +1,10 @@
 import { query } from './db';
 import { desaToLlmData, generateNarasi, getTier, type SusenasData } from './llm';
+import { ambilInfra, ambilSusenas } from './dataDesa';
 import { getCachedNarasi, setCachedNarasi } from './cache';
-import type { AnalisisPayload, Desa, Tier } from './types';
+import { diagnosaDesa } from './diagnosis';
+import { labelIdm } from './format';
+import type { AnalisisPayload, Desa, InfraDesa, SusenasKabupaten, Tier } from './types';
 
 /**
  * Hitung estimasi kebutuhan ideal berbasis data nyata desa.
@@ -69,12 +72,16 @@ export function rincianEstimasiBiaya(desa: Desa): RincianBiaya {
 
   const subtotal = komponen.reduce((a, k) => a + k.nilai, 0);
 
-  const idm = Number(desa.idm ?? 0.7);
+  // Ambang pakai labelIdm() (ambang resmi IDM) supaya label multiplier
+  // tidak bertentangan dengan badge status di layar. IDM kosong → 0,7
+  // (perilaku lama, setara Berkembang).
   let idmMultiplier = 1;
   let idmLabel = 'Maju/Mandiri';
-  if (idm < 0.49) { idmMultiplier = 1.8; idmLabel = 'Sangat tertinggal'; }
-  else if (idm < 0.6) { idmMultiplier = 1.5; idmLabel = 'Tertinggal'; }
-  else if (idm < 0.71) { idmMultiplier = 1.2; idmLabel = 'Berkembang'; }
+  switch (labelIdm(desa.idm ?? 0.7)) {
+    case 'SANGAT TERTINGGAL': idmMultiplier = 1.8; idmLabel = 'Sangat tertinggal'; break;
+    case 'TERTINGGAL': idmMultiplier = 1.5; idmLabel = 'Tertinggal'; break;
+    case 'BERKEMBANG': idmMultiplier = 1.2; idmLabel = 'Berkembang'; break;
+  }
 
   let podesMultiplier = 1;
   let podesLabel = 'Potensi tinggi';
@@ -163,32 +170,45 @@ export function parseRekomendasiKeys(desa: Desa): string[] {
   return [];
 }
 
-export async function resolveKegiatan(
+/** Kegiatan per kunci rekomendasi, urutan kunci mengikuti data desa. */
+export async function resolveKegiatanPerKey(
   rekomendasiKeys: string[],
   tier: Tier,
-): Promise<string[]> {
-  if (!rekomendasiKeys.length) return [];
+): Promise<Record<string, string[]>> {
+  if (!rekomendasiKeys.length) return {};
 
+  const out: Record<string, string[]> = {};
   try {
-    const rows = await query<{ kegiatan: string }>(
-      `SELECT kegiatan FROM kegiatan_config
+    const rows = await query<{ rekomendasi_key: string; kegiatan: string }>(
+      `SELECT rekomendasi_key, kegiatan FROM kegiatan_config
        WHERE rekomendasi_key = ANY($1::text[]) AND tier = $2
        ORDER BY rekomendasi_key`,
       [rekomendasiKeys, tier],
     );
     if (rows.length) {
-      return [...new Set(rows.map((r) => r.kegiatan))];
+      for (const key of rekomendasiKeys) {
+        const items = [...new Set(rows.filter((r) => r.rekomendasi_key === key).map((r) => r.kegiatan))];
+        if (items.length) out[key] = items;
+      }
+      return out;
     }
   } catch (err) {
     console.warn('[analisis] kegiatan_config query failed, pakai fallback:', err);
   }
 
-  const out: string[] = [];
   for (const key of rekomendasiKeys) {
     const items = FALLBACK_KEGIATAN[key]?.[tier];
-    if (items) out.push(...items);
+    if (items) out[key] = [...items];
   }
-  return [...new Set(out)];
+  return out;
+}
+
+export async function resolveKegiatan(
+  rekomendasiKeys: string[],
+  tier: Tier,
+): Promise<string[]> {
+  const perKey = await resolveKegiatanPerKey(rekomendasiKeys, tier);
+  return [...new Set(Object.values(perKey).flat())];
 }
 
 export function toPublicDesa(desa: Desa) {
@@ -211,109 +231,63 @@ export async function analyzeAnggaran(
   const tier = getTier(coveragePct);
   const podesTersedia = desa.klasifikasi_podes != null;
 
+  const kegiatanPerKey = podesTersedia
+    ? await resolveKegiatanPerKey(parseRekomendasiKeys(desa), tier)
+    : {};
+  const kegiatan = [...new Set(Object.values(kegiatanPerKey).flat())];
+  const { susenas, infra } = await ambilDataTambahan(desa.kode_bps);
+  const diagnosis = diagnosaDesa(desa, anggaran, estimasi, tier, kegiatanPerKey, { susenas, infra });
+
+  const dasar = {
+    anggaran,
+    estimasi_biaya_ideal: estimasi,
+    coverage_pct: Math.round(coveragePct * 100) / 100,
+    tier,
+    kegiatan,
+    rincian_biaya: rincian,
+    diagnosis,
+    susenas,
+    infra,
+    tahun_data: 'Podes 2025, IDM 2024, Susenas 2025',
+    podes_tersedia: podesTersedia,
+  };
+
   // Cek cache dulu
   try {
     const cached = await getCachedNarasi(desa.kode_bps, anggaran);
     if (cached) {
-      const keys = parseRekomendasiKeys(desa);
-      const kegiatan = podesTersedia
-        ? await resolveKegiatan(keys, tier)
-        : [];
+      // Narasi template di cache tetap dilabeli template — UI menyembunyikannya
+      // karena isinya sudah tampil di panel diagnosis.
       return {
-        anggaran,
-        estimasi_biaya_ideal: estimasi,
-        coverage_pct: Math.round(coveragePct * 100) / 100,
-        tier,
-        kegiatan,
-        rincian_biaya: rincian,
+        ...dasar,
         narasi: cached.narasi,
-        sumber_narasi: 'cache',
-        tahun_data: 'Podes 2025, IDM 2024',
-        podes_tersedia: podesTersedia,
+        sumber_narasi: cached.sumber === 'template' ? 'template' : 'cache',
       };
     }
   } catch (err) {
     console.warn('[analisis] cache read failed:', err);
   }
 
-  const keys = parseRekomendasiKeys(desa);
-  const kegiatan = podesTersedia ? await resolveKegiatan(keys, tier) : [];
-
-  // Mode cepat: kembalikan angka + kegiatan tanpa menunggu LLM (20-35 detik).
+  // Mode cepat: kembalikan angka + diagnosis tanpa menunggu LLM (20-35 detik).
   // Halaman hasil memakai ini untuk tampil <1 detik, lalu meminta narasi
   // via /api/narasi di belakang layar. JANGAN tulis cache di sini —
   // narasi masih kosong, nanti menimpa narasi asli.
   if (opsi.tanpaLlm) {
     return {
-      anggaran,
-      estimasi_biaya_ideal: estimasi,
-      coverage_pct: Math.round(coveragePct * 100) / 100,
-      tier,
-      kegiatan,
-      rincian_biaya: rincian,
+      ...dasar,
       narasi: { konteks: '', posisi_anggaran: '', rekomendasi: [], disclaimer: '' },
       sumber_narasi: 'pending',
-      tahun_data: 'Podes 2025, IDM 2024',
-      podes_tersedia: podesTersedia,
     };
   }
 
-  // Fetch Susenas data untuk konteks LLM
-  let susenasData: SusenasData | null = null;
-  try {
-    const r101 = desa.kode_bps.substring(0, 2);
-    const r102 = desa.kode_bps.substring(2, 4);
-    const susenasRows = await query<{
-      total_rt: number; khawatir_makan_pct: number | null;
-      tidak_makan_sehat_pct: number | null; sedikit_jenis_makanan_pct: number | null;
-      lewat_waktu_makan_pct: number | null; makan_lebih_sedikit_pct: number | null;
-      kehabisan_makanan_pct: number | null; lapar_tidak_makan_pct: number | null;
-      tidak_makan_seharian_pct: number | null; rata_rumah_milik_sendiri_pct: number | null;
-      rata_lantai_rumah: number | null; air_pdam_pct: number | null; air_sumur_pct: number | null;
-      kekurangan_air_pct: number | null; punya_toilet_pct: number | null; listrik_pln_pct: number | null;
-      rata_umur: number | null; punya_nik_pct: number | null; tidak_sekolah_pct: number | null;
-      sd_pct: number | null; smp_pct: number | null; sma_pct: number | null; buta_huruf_pct: number | null;
-    }>(`SELECT
-      count(*) as total_rt,
-      count(*) FILTER (WHERE r1501 = 1)::float / NULLIF(count(*),0) * 100 as khawatir_makan_pct,
-      count(*) FILTER (WHERE r1502 = 1)::float / NULLIF(count(*),0) * 100 as tidak_makan_sehat_pct,
-      count(*) FILTER (WHERE r1503 = 1)::float / NULLIF(count(*),0) * 100 as sedikit_jenis_makanan_pct,
-      count(*) FILTER (WHERE r1504 = 1)::float / NULLIF(count(*),0) * 100 as lewat_waktu_makan_pct,
-      count(*) FILTER (WHERE r1505 = 1)::float / NULLIF(count(*),0) * 100 as makan_lebih_sedikit_pct,
-      count(*) FILTER (WHERE r1506 = 1)::float / NULLIF(count(*),0) * 100 as kehabisan_makanan_pct,
-      count(*) FILTER (WHERE r1507 = 1)::float / NULLIF(count(*),0) * 100 as lapar_tidak_makan_pct,
-      count(*) FILTER (WHERE r1508 = 1)::float / NULLIF(count(*),0) * 100 as tidak_makan_seharian_pct,
-      count(*) FILTER (WHERE r1602 = 1)::float / NULLIF(count(*),0) * 100 as rata_rumah_milik_sendiri_pct,
-      avg(r1604) as rata_lantai_rumah,
-      count(*) FILTER (WHERE r1610a = 1)::float / NULLIF(count(*),0) * 100 as air_pdam_pct,
-      count(*) FILTER (WHERE r1610a = 2)::float / NULLIF(count(*),0) * 100 as air_sumur_pct,
-      count(*) FILTER (WHERE r1612 = 1)::float / NULLIF(count(*),0) * 100 as kekurangan_air_pct,
-      count(*) FILTER (WHERE r1609a = 1)::float / NULLIF(count(*),0) * 100 as punya_toilet_pct,
-      count(*) FILTER (WHERE r1616 = 1)::float / NULLIF(count(*),0) * 100 as listrik_pln_pct,
-      avg(r407) as rata_umur,
-      count(*) FILTER (WHERE r505 = 1)::float / NULLIF(count(*),0) * 100 as punya_nik_pct,
-      count(*) FILTER (WHERE r611 = 5)::float / NULLIF(count(*),0) * 100 as tidak_sekolah_pct,
-      count(*) FILTER (WHERE r613 IN (1,2,3,4,5,6))::float / NULLIF(count(*),0) * 100 as sd_pct,
-      count(*) FILTER (WHERE r613 IN (7,8,9,10,11,12))::float / NULLIF(count(*),0) * 100 as smp_pct,
-      count(*) FILTER (WHERE r613 IN (13,14,15,16,17))::float / NULLIF(count(*),0) * 100 as sma_pct,
-      count(*) FILTER (WHERE r608 = 5)::float / NULLIF(count(*),0) * 100 as buta_huruf_pct
-    FROM susenas_rt rt
-    LEFT JOIN susenas_ind ind ON rt.psu = ind.psu AND rt.urut = ind.urut
-    WHERE rt.r101 = $1 AND rt.r102 = $2`, [r101, r102]);
-
-    if (susenasRows.length > 0 && Number(susenasRows[0].total_rt) > 0) {
-      susenasData = { tersedia: true, ...susenasRows[0] } as unknown as SusenasData;
-    }
-  } catch (err) {
-    console.warn('[analisis] susenas fetch failed:', err);
-  }
+  const susenasData = susenas?.tersedia ? (susenas as unknown as SusenasData) : null;
 
   // Kolom desa.estimasi_biaya di DB bisa basi (tidak ikut berubah saat
   // rumus diperbaiki). Layar & perhitungan memakai rincianEstimasiBiaya()
   // sebagai sumber tunggal — timpa di sini supaya narasi AI tidak
   // menyebut angka yang berbeda dari yang dilihat pengguna.
   const desaData = { ...desaToLlmData(desa), estimasi_biaya: estimasi };
-  const { narasi, sumber } = await generateNarasi(desaData, anggaran, kegiatan, susenasData);
+  const { narasi, sumber } = await generateNarasi(desaData, anggaran, kegiatan, susenasData, diagnosis);
 
   try {
     await setCachedNarasi(desa.kode_bps, anggaran, narasi, sumber);
@@ -321,16 +295,22 @@ export async function analyzeAnggaran(
     console.warn('[analisis] cache write failed:', err);
   }
 
-  return {
-    anggaran,
-    estimasi_biaya_ideal: estimasi,
-    coverage_pct: Math.round(coveragePct * 100) / 100,
-    tier,
-    kegiatan,
-    rincian_biaya: rincian,
-    narasi,
-    sumber_narasi: sumber,
-    tahun_data: 'Podes 2025, IDM 2024',
-    podes_tersedia: podesTersedia,
-  };
+  return { ...dasar, narasi, sumber_narasi: sumber };
+}
+
+/** Susenas + fasilitas Podes; gagal salah satu → null, analisis tetap jalan. */
+export async function ambilDataTambahan(
+  kodeBps: string,
+): Promise<{ susenas: SusenasKabupaten | null; infra: InfraDesa | null }> {
+  const [susenas, infra] = await Promise.all([
+    ambilSusenas(kodeBps).catch((err) => {
+      console.warn('[analisis] susenas gagal:', err);
+      return null;
+    }),
+    ambilInfra(kodeBps).catch((err) => {
+      console.warn('[analisis] infra gagal:', err);
+      return null;
+    }),
+  ]);
+  return { susenas, infra };
 }

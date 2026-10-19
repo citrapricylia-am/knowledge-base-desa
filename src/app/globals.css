@@ -289,3 +289,10 @@ body {
   /* Hindari elemen tinggi memaksa halaman kosong */
   .flex-1 { min-height: 0 !important; }
 }
+
+/* Bar alokasi bertumpuk: di cetak semua isi bar jadi hitam (aturan di atas),
+   jadi segmen dibedakan dengan selang-seling gelap/terang. */
+@media print {
+  .alokasi-bar > .alokasi-seg:nth-child(odd) { background: #18181b !important; }
+  .alokasi-bar > .alokasi-seg:nth-child(even) { background: #9ca3af !important; }
+}

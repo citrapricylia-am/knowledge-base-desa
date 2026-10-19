@@ -104,6 +104,108 @@ export interface RincianBiayaPayload {
   total: number;
 }
 
+/** Agregat Susenas per KABUPATEN (bukan desa). Angka pg bisa tiba sebagai string. */
+export interface SusenasKabupaten {
+  tersedia: boolean;
+  pesan?: string;
+  r101?: string;
+  r102?: string;
+  [kolom: string]: number | string | boolean | null | undefined;
+}
+
+/** Fasilitas tercatat di Podes 2025 untuk satu desa. */
+export interface InfraDesa {
+  tersedia: boolean;
+  total: number;
+  fasilitas: Record<string, { label: string; nama: string }[]>;
+  /** Jumlah per label fasilitas, mis. { SD: 2, MI: 1, Posyandu: 4 } */
+  jumlah: Record<string, number>;
+}
+
+export type TingkatTemuan = 'kritis' | 'tinggi' | 'sedang' | 'baik';
+
+/** Satu temuan hasil diagnosis: masalah atau kekuatan desa, lengkap dengan pembanding. */
+export interface Temuan {
+  id: string;
+  jenis: 'masalah' | 'kekuatan';
+  tingkat: TingkatTemuan;
+  pilar: string;
+  judul: string;
+  nilai: string;
+  pembanding: string;
+  penjelasan: string;
+  saran: string;
+  sumber: string;
+}
+
+export interface PilarAnalisis {
+  kode: 'iks' | 'ike' | 'ikl';
+  label: string;
+  nilai: number;
+  tingkat: TingkatTemuan;
+  cakupan: string;
+  selisihKeMaju: number;
+}
+
+export interface PosisiIdm {
+  skor: number;
+  status: string;
+  statusBerikut: string | null;
+  ambangBerikut: number | null;
+  selisihKeBerikut: number;
+  pilar: PilarAnalisis[];
+  pilarTerlemah: PilarAnalisis['kode'] | null;
+  /** Kenaikan pilar terlemah bila hanya pilar itu yang diperbaiki; null = tidak cukup satu pilar. */
+  kenaikanPilarTerlemah: number | null;
+  penjelasan: string;
+}
+
+export interface ProgramRekomendasi {
+  key: string;
+  prioritas: number;
+  urgensi: 'mendesak' | 'penting' | 'pendukung';
+  bidang: string;
+  pilar: string;
+  kegiatan: string[];
+  tujuan: string;
+  alasan: string[];
+  alokasi: number;
+  porsiPct: number;
+  sasaran: string;
+  jangkauan: string | null;
+  langkah: string[];
+  indikator: string[];
+  mitra: string[];
+  danaPelengkap: string[];
+  risiko: { risiko: string; mitigasi: string }[];
+  durasi: string;
+}
+
+export interface TahapanPelaksanaan {
+  fase: string;
+  waktu: string;
+  kegiatan: string[];
+}
+
+/** Hubungan sebab-akibat antar beberapa temuan. */
+export interface Keterkaitan {
+  judul: string;
+  isi: string;
+  temuan: string[];
+}
+
+export interface Diagnosis {
+  ringkasan: string[];
+  keterkaitan: Keterkaitan[];
+  /** id temuan serius yang tidak tertangani program mana pun di paket ini */
+  tidakTercakup: string[];
+  posisiIdm: PosisiIdm | null;
+  temuan: Temuan[];
+  program: ProgramRekomendasi[];
+  tahapan: TahapanPelaksanaan[];
+  catatanData: string[];
+}
+
 export interface AnalisisPayload {
   anggaran: number;
   estimasi_biaya_ideal: number;
@@ -115,6 +217,9 @@ export interface AnalisisPayload {
   tahun_data: string;
   podes_tersedia: boolean;
   rincian_biaya: RincianBiayaPayload;
+  diagnosis: Diagnosis;
+  susenas: SusenasKabupaten | null;
+  infra: InfraDesa | null;
 }
 
 export interface AnalisisResponse {
