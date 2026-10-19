@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Users,
   Home,
@@ -123,13 +123,6 @@ function pctStatus(n: number | null, opts: { goodMax?: number; warnMax?: number;
   return 'masalah';
 }
 
-function idmStatus(score: number | null): Status {
-  if (score == null) return 'netral';
-  if (score >= 0.7072) return 'baik';
-  if (score >= 0.5989) return 'perhatian';
-  return 'masalah';
-}
-
 function InfoTip({ text }: { text: string }) {
   return (
     <span className="relative inline-flex group/tip">
@@ -239,25 +232,15 @@ function RowNote({ label, value, status, note }: {
   );
 }
 
+/**
+ * Data mentah desa. Susenas & fasilitas datang dari payload /api/analisis
+ * (sumber yang sama dengan diagnosis), jadi tidak ada fetch ulang di sini.
+ * Skor IDM tidak ditampilkan — sudah ada di panel Posisi IDM.
+ */
 export default function ProfilDesaPanel({
-  kodeBps, desa,
-}: { kodeBps: string; desa: DesaData }) {
-  const [susenas, setSusenas] = useState<SusenasData | null>(null);
-  const [infra, setInfra] = useState<InfraData | null>(null);
-  const [loading, setLoading] = useState(true);
+  desa, susenas, infra,
+}: { desa: DesaData; susenas: SusenasData | null; infra: InfraData | null }) {
   const [openKategori, setOpenKategori] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    Promise.all([
-      fetch(`/api/susenas/${kodeBps}`).then(r => r.json()).catch(() => ({ tersedia: false })),
-      fetch(`/api/podes-infra/${kodeBps}`).then(r => r.json()).catch(() => ({ tersedia: false, total: 0, fasilitas: {} })),
-    ]).then(([s, i]) => {
-      if (!cancelled) { setSusenas(s); setInfra(i); setLoading(false); }
-    });
-    return () => { cancelled = true; };
-  }, [kodeBps]);
 
   const jiwa = Number(desa.jumlah_jiwa ?? 0);
   const rt = Number(desa.jumlah_rt ?? 0);
@@ -313,35 +296,6 @@ export default function ProfilDesaPanel({
             />
           </div>
         )}
-      </div>
-
-      {/* === IDM (catatan hanya di pilar yang bermasalah) === */}
-      <div className="glass-card rounded-2xl p-5 space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Map className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-sm font-semibold text-white">Indeks Desa Membangun</h3>
-          </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-white tabular-nums">
-              {desa.idm != null ? fmtNum(Number(desa.idm), 4) : '—'}
-            </div>
-            {desa.status_idm_computed && (
-              <div className="text-xs text-white/40">{desa.status_idm_computed}</div>
-            )}
-          </div>
-        </div>
-        <p className="text-[10px] text-white/30">
-          Skor 0–1: Mandiri ≥0,81 · Maju ≥0,71 · Berkembang ≥0,60 · Tertinggal ≥0,49
-        </p>
-        <div className="grid grid-cols-3 gap-4">
-          <IDMBar label="Ketahanan Sosial" value={toNum(desa.iks)} color="bg-sky-500"
-            desc="Kesehatan, pendidikan, dan modal sosial desa" />
-          <IDMBar label="Ketahanan Ekonomi" value={toNum(desa.ike)} color="bg-amber-500"
-            desc="Pendapatan, lapangan kerja, dan aset produktif" />
-          <IDMBar label="Ketahanan Lingkungan" value={toNum(desa.ikl)} color="bg-emerald-500"
-            desc="Infrastruktur, lingkungan, dan ketahanan bencana" />
-        </div>
       </div>
 
       {/* === LINGKUNGAN & WILAYAH === */}
@@ -550,45 +504,11 @@ export default function ProfilDesaPanel({
         </div>
       )}
 
-      {loading && (
-        <div className="flex items-center gap-2 py-2">
-          <div className="w-4 h-4 rounded-full border-2 border-white/10 border-t-white/50 animate-spin" />
-          <p className="text-xs text-white/30">Memuat data…</p>
-        </div>
-      )}
-
       <div className="flex items-center gap-4 text-[10px] text-white/25">
         <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />Baik</span>
         <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />Perhatian</span>
         <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-rose-400" />Masalah</span>
       </div>
-    </div>
-  );
-}
-
-function IDMBar({ label, value, color, desc }: {
-  label: string; value: number | null; color: string; desc?: string;
-}) {
-  const pct = value == null ? 0 : Math.min(100, Math.max(0, value * 100));
-  const st = idmStatus(value);
-  const statusText = value == null ? '' :
-    value >= 0.7072 ? 'Kondisi baik' :
-    value >= 0.5989 ? 'Perlu penguatan' :
-    'Butuh intervensi';
-  return (
-    <div className="space-y-1">
-      <div className="flex justify-between items-center text-xs">
-        <span className="text-white/50 font-medium">{label}</span>
-        <div className="flex items-center gap-1.5">
-          <span className={`w-1.5 h-1.5 rounded-full ${statusDot[st]}`} />
-          <span className="text-white/80 tabular-nums font-medium">{value != null ? value.toLocaleString('id-ID', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '—'}</span>
-        </div>
-      </div>
-      <div className="h-2 rounded-full bg-white/5 overflow-hidden">
-        <div className={`h-full rounded-full ${color} transition-all duration-700`} style={{ width: `${pct}%` }} />
-      </div>
-      {desc && <p className="text-[10px] text-white/25 italic">{desc}</p>}
-      {statusText && <p className={`text-[10px] ${statusDot[st].replace('bg-', 'text-')}`}>{statusText}</p>}
     </div>
   );
 }

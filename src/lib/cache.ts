@@ -10,7 +10,8 @@ export function buildCacheHash(kodeBps: string, anggaran: number): string {
   // di narasi_cache otomatis tidak kena dan narasi dibuat ulang.
   // v2: angka desimal pakai koma (id-ID), bukan titik.
   // v3: rekomendasi per bidang program (judul = bidang), 4 poin, berbasis diagnosis.
-  const VERSI = 'v3';
+  // v4: konteks/posisi tidak mengulang angka; poin rekomendasi = wawasan khas desa.
+  const VERSI = 'v4';
   return createHash('sha256').update(`${kodeBps}:${bucket}:${VERSI}`).digest('hex');
 }
 

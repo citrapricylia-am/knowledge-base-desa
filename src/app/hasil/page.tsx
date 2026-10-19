@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, AlertTriangle, Calculator, Printer, Database, Info } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Printer, Database, Info } from 'lucide-react';
 import ProfilDesaPanel from '@/components/ProfilDesaPanel';
 import NarasiPanel from '@/components/NarasiPanel';
 import TanyaAnalisis from '@/components/TanyaAnalisis';
@@ -13,7 +13,7 @@ import TemuanPanel from '@/components/TemuanPanel';
 import RencanaAksiPanel from '@/components/RencanaAksiPanel';
 import { TombolBagikan } from '@/components/TombolBagikan';
 import type { AnalisisResponse, NarasiItem } from '@/lib/types';
-import { formatPct, formatRp, podesColor, podesLabel, statusIdmColor, tierColor, tierLabel, tierDesc } from '@/lib/format';
+import { podesColor, podesLabel, statusIdmColor } from '@/lib/format';
 
 const norm = (s: string) => s.trim().toLowerCase();
 
@@ -43,8 +43,8 @@ const NAV = [
   { href: '#posisi-idm', label: 'Posisi IDM' },
   { href: '#temuan', label: 'Temuan' },
   { href: '#rencana', label: 'Rencana aksi' },
-  { href: '#narasi', label: 'Narasi' },
-  { href: '#data', label: 'Data desa' },
+  { href: '#narasi', label: 'Interpretasi AI' },
+  { href: '#data', label: 'Data mentah' },
 ];
 
 function HasilContent() {
@@ -165,11 +165,13 @@ function HasilContent() {
   }
 
   const { desa, analisis } = data;
-  const coverageWidth = Math.min(100, Math.max(0, analisis.coverage_pct));
   const { diagnosis } = analisis;
   const { perBidang, lain } = pasangkanCatatanAi(analisis);
+  const narasiTemplate = analisis.sumber_narasi === 'template' && !narasiLoading;
   const nav = NAV.filter((n) =>
-    (n.href !== '#posisi-idm' || diagnosis.posisiIdm) && (n.href !== '#rencana' || diagnosis.program.length),
+    (n.href !== '#posisi-idm' || diagnosis.posisiIdm) &&
+    (n.href !== '#rencana' || diagnosis.program.length) &&
+    (n.href !== '#narasi' || !narasiTemplate || lain.length),
   );
 
   return (
@@ -197,7 +199,7 @@ function HasilContent() {
       </div>
 
       {/* Nama desa + badges */}
-      <header className="glass-card rounded-3xl p-6 space-y-4 print-header">
+      <header className="glass-card rounded-3xl p-6 print-header">
         <div className="print-only" style={{ display: 'none' }}>
           <h1 style={{ fontSize: '20pt', fontWeight: 'bold', marginBottom: '4px' }}>
             Laporan Analisis Desa — DesaLens
@@ -231,40 +233,6 @@ function HasilContent() {
           </div>
         </div>
 
-        {/* Cakupan anggaran */}
-        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4 space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <h3 className="text-xs uppercase tracking-wide text-white/45">Cakupan anggaran</h3>
-              <p className="text-lg font-semibold text-white mt-1">
-                {formatRp(analisis.anggaran)}
-                <span className="text-white/50 font-normal text-sm">
-                  {' '}= {formatPct(analisis.coverage_pct)} dari kebutuhan ideal{' '}
-                  {formatRp(analisis.estimasi_biaya_ideal)}
-                </span>
-              </p>
-            </div>
-            <span className={`px-2.5 py-1 rounded-md border text-xs ${tierColor(analisis.tier)}`}>
-              {tierLabel(analisis.tier)}
-            </span>
-          </div>
-          <div className="h-3 rounded-full bg-white/5 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-white transition-all duration-700"
-              style={{ width: `${coverageWidth}%` }}
-            />
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs text-white/50 leading-relaxed max-w-2xl">{tierDesc(analisis.tier)}</p>
-            <Link
-              href={`/hasil/anggaran?kode_bps=${desa.kode_bps}&anggaran=${analisis.anggaran}`}
-              className="print-hide inline-flex items-center gap-1.5 text-xs text-amber-300/90 hover:text-amber-200 transition-colors"
-            >
-              <Calculator className="w-3.5 h-3.5" />
-              Rincian perhitungan & simulasi anggaran →
-            </Link>
-          </div>
-        </div>
       </header>
 
       {/* Navigasi bagian */}
@@ -283,18 +251,19 @@ function HasilContent() {
         ))}
       </nav>
 
-      <RingkasanEksekutif analisis={analisis} />
+      <RingkasanEksekutif analisis={analisis} kodeBps={desa.kode_bps} />
 
       {diagnosis.posisiIdm && <PosisiIdmPanel posisi={diagnosis.posisiIdm} />}
 
-      <TemuanPanel temuan={diagnosis.temuan} />
+      <TemuanPanel temuan={diagnosis.temuan} keterkaitan={diagnosis.keterkaitan} />
 
       {diagnosis.program.length > 0 ? (
         <RencanaAksiPanel
           program={diagnosis.program}
           tahapan={diagnosis.tahapan}
           anggaran={analisis.anggaran}
-          catatanAi={perBidang}
+          tidakTercakup={diagnosis.temuan.filter((t) => diagnosis.tidakTercakup.includes(t.id))}
+          catatanAi={narasiTemplate ? {} : perBidang}
           sedangMenyusun={narasiLoading}
         />
       ) : (
@@ -310,25 +279,35 @@ function HasilContent() {
         </div>
       )}
 
-      {/* Narasi AI */}
-      <section id="narasi" className="glass-card rounded-3xl p-5 md:p-6 scroll-mt-24">
-        <NarasiPanel
-          narasi={analisis.narasi}
-          sumber={analisis.sumber_narasi}
-          rekomendasiLain={lain}
-          sedangMenyusun={narasiLoading}
-          gagalMenyusun={narasiError}
-        />
-      </section>
+      {/* Narasi AI — template disembunyikan: isinya sama dengan panel diagnosis di atas */}
+      {(!narasiTemplate || lain.length > 0) && (
+        <section id="narasi" className="glass-card rounded-3xl p-5 md:p-6 scroll-mt-24">
+          <NarasiPanel
+            narasi={analisis.narasi}
+            sumber={analisis.sumber_narasi}
+            rekomendasiLain={lain}
+            sedangMenyusun={narasiLoading}
+            gagalMenyusun={narasiError}
+            sembunyikanParagraf={narasiTemplate}
+          />
+        </section>
+      )}
 
-      {/* Data pendukung */}
-      <section id="data" className="glass-card rounded-3xl p-5 md:p-6 space-y-4 scroll-mt-24">
-        <div className="flex items-center gap-2">
-          <Database className="w-4 h-4 text-white/50" />
-          <h2 className="text-base font-semibold text-white">Data pendukung desa</h2>
+      {/* Data mentah — dilipat: angka pentingnya sudah dianalisis di atas */}
+      <details id="data" className="glass-card rounded-3xl p-5 md:p-6 scroll-mt-24 group/data">
+        <summary className="cursor-pointer list-none flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2">
+            <Database className="w-4 h-4 text-white/50" />
+            <span className="text-base font-semibold text-white">Data mentah desa</span>
+            <span className="text-xs text-white/40 hidden sm:inline">demografi, wilayah, fasilitas, Susenas</span>
+          </span>
+          <span className="text-xs text-white/50 group-open/data:hidden">Tampilkan</span>
+          <span className="text-xs text-white/50 hidden group-open/data:inline">Sembunyikan</span>
+        </summary>
+        <div className="mt-4">
+          <ProfilDesaPanel desa={desa} susenas={analisis.susenas} infra={analisis.infra} />
         </div>
-        <ProfilDesaPanel kodeBps={desa.kode_bps} desa={desa} />
-      </section>
+      </details>
 
       {/* Tanya AI tentang analisis ini */}
       <div className="glass-card rounded-3xl p-5 md:p-6 print-hide">

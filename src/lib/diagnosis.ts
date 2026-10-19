@@ -2,6 +2,9 @@ import { labelIdm } from './format';
 import type {
   Desa,
   Diagnosis,
+  InfraDesa,
+  Keterkaitan,
+  SusenasKabupaten,
   PilarAnalisis,
   PosisiIdm,
   ProgramRekomendasi,
@@ -57,6 +60,17 @@ const fmtSkor = (n: number) =>
 const fmtPct = (n: number) =>
   `${n.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 const fmtAngka = (n: number) => Math.round(n).toLocaleString('id-ID');
+
+/** Huruf kecil di awal untuk dipakai di tengah kalimat — akronim & nama pilar dibiarkan. */
+const kecilAwal = (s: string) => (/^(Ketahanan|[A-Z]{2,})/.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1));
+const besarAwal = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** "judul (nilai)" untuk kalimat; nilai yang sudah berkurung tidak dibungkus lagi. */
+function sebutTemuan(t: Temuan): string {
+  const j = kecilAwal(t.judul);
+  if (t.nilai === 'Tidak ada') return j;
+  return t.nilai.includes('(') ? `${j}, ${t.nilai}` : `${j} (${t.nilai})`;
+}
 export const fmtRupiah = (n: number) => `Rp ${Math.round(n).toLocaleString('id-ID')}`;
 
 /** Rp ringkas untuk kalimat: "Rp 1,25 miliar", "Rp 350 juta". */
@@ -165,7 +179,12 @@ export function posisiIdm(desa: Desa): PosisiIdm | null {
  * Ambang mengikuti status-dot di ProfilDesaPanel supaya warna di profil
  * dan tingkat temuan di analisis tidak saling bertentangan.
  */
-export function kumpulkanTemuan(desa: Desa, posisi: PosisiIdm | null): Temuan[] {
+export interface DataTambahan {
+  susenas?: SusenasKabupaten | null;
+  infra?: InfraDesa | null;
+}
+
+export function kumpulkanTemuan(desa: Desa, posisi: PosisiIdm | null, tambahan: DataTambahan = {}): Temuan[] {
   const out: Temuan[] = [];
   const rt = num(desa.jumlah_rt) ?? 0;
   const jiwa = num(desa.jumlah_jiwa) ?? 0;
@@ -298,46 +317,109 @@ export function kumpulkanTemuan(desa: Desa, posisi: PosisiIdm | null): Temuan[] 
     });
   }
 
-  // Fasilitas dasar
-  const fasilitas: { id: string; ada: unknown; nama: string; pilar: string; dampak: string; saran: string }[] = [
-    {
-      id: 'faskes',
-      ada: desa.ada_faskes,
-      nama: 'fasilitas kesehatan',
-      pilar: 'Ketahanan Sosial',
-      dampak: `${fmtAngka(jiwa)} jiwa harus keluar desa untuk layanan kesehatan dasar, termasuk ibu hamil dan balita.`,
-      saran: 'Pastikan minimal Poskesdes/Pustu dengan bidan desa; sementara itu jadwalkan Puskesmas keliling rutin.',
-    },
-    {
-      id: 'sd',
-      ada: desa.ada_sd,
-      nama: 'SD',
-      pilar: 'Ketahanan Sosial',
-      dampak: 'Anak usia 7–12 tahun harus menempuh perjalanan ke desa lain; risiko putus sekolah lebih tinggi.',
-      saran: 'Koordinasi dengan Dinas Pendidikan untuk SD kecil/kelas jauh atau bantuan transportasi siswa.',
-    },
-    {
-      id: 'smp',
-      ada: desa.ada_smp,
-      nama: 'SMP',
-      pilar: 'Ketahanan Sosial',
-      dampak: 'Transisi SD→SMP rawan putus karena jarak dan biaya transportasi.',
-      saran: 'Pertimbangkan SMP satu atap, asrama, atau subsidi transportasi siswa.',
-    },
-  ];
-  for (const f of fasilitas) {
-    if (Number(f.ada ?? 0)) continue;
+  // Fasilitas — pakai daftar fasilitas Podes 2025 (per jenjang/jenis) bila ada;
+  // kalau tidak, jatuh ke flag ada_sd/ada_smp/ada_faskes.
+  const infra = tambahan.infra?.tersedia ? tambahan.infra : null;
+  const hitung = (labels: string[]) => labels.reduce((a, l) => a + (infra?.jumlah[l] ?? 0), 0);
+  const rincian = (labels: string[]) =>
+    labels.filter((l) => infra?.jumlah[l]).map((l) => `${infra!.jumlah[l]} ${l}`).join(', ');
+  const tidakAda = (id: string, tingkat: TingkatTemuan, nama: string, pilar: string, penjelasan: string, saran: string) =>
     out.push({
-      id: f.id,
+      id,
       jenis: 'masalah',
-      tingkat: f.id === 'smp' ? 'sedang' : 'tinggi',
-      pilar: f.pilar,
-      judul: `Belum ada ${f.nama} di desa`,
+      tingkat,
+      pilar,
+      judul: `Belum ada ${nama} di desa`,
       nilai: 'Tidak ada',
       pembanding: 'Standar pelayanan minimal: tersedia di desa/terjangkau',
-      penjelasan: f.dampak,
-      saran: f.saran,
-      sumber: 'Podes',
+      penjelasan,
+      saran,
+      sumber: infra ? 'Podes 2025 (daftar fasilitas)' : 'Podes',
+    });
+
+  const LABEL_FASKES = ['Rumah Sakit', 'Puskesmas', 'Puskesmas Pembantu', 'Polindes', 'Puskesdes', 'Klinik', 'Praktik Bidan', 'Praktik Dokter', 'Balai Pengobatan'];
+  const nFaskes = infra ? hitung(LABEL_FASKES) : Number(desa.ada_faskes ?? 0);
+  if (!nFaskes) {
+    tidakAda('faskes', 'tinggi', 'fasilitas kesehatan', 'Ketahanan Sosial',
+      `${fmtAngka(jiwa)} jiwa harus keluar desa untuk layanan kesehatan dasar, termasuk ibu hamil dan balita.`,
+      'Pastikan minimal Poskesdes/Pustu dengan bidan desa; sementara itu jadwalkan Puskesmas keliling rutin.');
+  }
+  if (infra) {
+    const nPosyandu = hitung(['Posyandu']);
+    if (!nPosyandu) {
+      tidakAda('posyandu', 'tinggi', 'posyandu', 'Ketahanan Sosial',
+        'Tanpa posyandu, pemantauan tumbuh kembang balita, imunisasi, dan deteksi stunting tidak berjalan rutin.',
+        'Bentuk posyandu per dusun dengan kader terlatih; ini intervensi stunting paling murah.');
+    }
+    if (nFaskes || nPosyandu) {
+      out.push({
+        id: 'faskes_ada',
+        jenis: 'kekuatan',
+        tingkat: 'baik',
+        pilar: 'Ketahanan Sosial',
+        judul: 'Layanan kesehatan dasar tersedia',
+        nilai: rincian([...LABEL_FASKES, 'Posyandu']),
+        pembanding: 'Podes 2025',
+        penjelasan: 'Fasilitas ini bisa menjadi titik layanan untuk program kesehatan dan gizi.',
+        saran: 'Perkuat yang sudah ada (alat, kader, jadwal) sebelum membangun baru.',
+        sumber: 'Podes 2025 (daftar fasilitas)',
+      });
+    }
+  }
+
+  const nPaud = infra ? hitung(['Kelompok Bermain', 'TK', 'RA', 'Bustanul Atfal']) : null;
+  const nSd = infra ? hitung(['SD', 'MI']) : Number(desa.ada_sd ?? 0);
+  const nSmp = infra ? hitung(['SMP', 'MTs']) : Number(desa.ada_smp ?? 0);
+  const nSma = infra ? hitung(['SMA', 'MA', 'SMK', 'MAK']) : null;
+  if (nPaud === 0) {
+    tidakAda('paud', 'sedang', 'PAUD (KB/TK/RA)', 'Ketahanan Sosial',
+      'Anak usia 3–6 tahun kehilangan stimulasi dini; kesiapan masuk SD dan deteksi gangguan tumbuh kembang terlambat.',
+      'Buka PAUD berbasis komunitas (bisa memakai balai desa/rumah warga) dengan bunda PAUD terlatih.');
+  }
+  if (!nSd) {
+    tidakAda('sd', 'tinggi', 'SD/MI', 'Ketahanan Sosial',
+      'Anak usia 7–12 tahun harus menempuh perjalanan ke desa lain; risiko putus sekolah lebih tinggi.',
+      'Koordinasi dengan Dinas Pendidikan untuk SD kecil/kelas jauh atau bantuan transportasi siswa.');
+  }
+  if (!nSmp) {
+    tidakAda('smp', 'sedang', 'SMP/MTs', 'Ketahanan Sosial',
+      'Transisi SD→SMP rawan putus karena jarak dan biaya transportasi.',
+      'Pertimbangkan SMP satu atap, asrama, atau subsidi transportasi siswa.');
+  } else if (nSma === 0) {
+    tidakAda('sma', 'sedang', 'SMA/MA/SMK', 'Ketahanan Sosial',
+      'Lulusan SMP harus keluar desa untuk melanjutkan; banyak yang berhenti dan langsung bekerja.',
+      'Beasiswa dan bantuan transportasi/asrama untuk lulusan SMP; jalin kerja sama dengan SMK terdekat.');
+  }
+  if (infra && nSd && nSmp && nSma) {
+    out.push({
+      id: 'sekolah_ada',
+      jenis: 'kekuatan',
+      tingkat: 'baik',
+      pilar: 'Ketahanan Sosial',
+      judul: 'Sekolah tersedia hingga jenjang menengah',
+      nilai: rincian(['Kelompok Bermain', 'TK', 'RA', 'SD', 'MI', 'SMP', 'MTs', 'SMA', 'MA', 'SMK', 'MAK']),
+      pembanding: 'Podes 2025',
+      penjelasan: 'Akses sekolah di desa sudah lengkap; tantangan beralih ke mutu dan keberlanjutan belajar.',
+      saran: 'Fokus pada mutu (guru, buku, literasi) dan mencegah putus sekolah, bukan gedung baru.',
+      sumber: 'Podes 2025 (daftar fasilitas)',
+    });
+  }
+
+  // Telekomunikasi — akses pasar, informasi, dan layanan digital
+  if (infra && !hitung(['Menara Seluler', 'Jasa Internet', 'Warnet'])) {
+    out.push({
+      id: 'digital',
+      jenis: 'masalah',
+      tingkat: 'sedang',
+      pilar: 'Ketahanan Ekonomi',
+      judul: 'Tidak tercatat menara seluler/penyedia internet',
+      nilai: 'Tidak ada',
+      pembanding: 'Podes 2025: menara seluler, jasa internet, warnet',
+      penjelasan:
+        'Tanpa infrastruktur telekomunikasi di desa, pemasaran daring, layanan administrasi digital, dan informasi harga sulit dijangkau. ' +
+        '(Sinyal mungkin masih dari menara desa tetangga — perlu dicek di lapangan.)',
+      saran: 'Petakan titik sinyal; usulkan BTS/akses internet desa ke Kominfo (BAKTI) atau pasang internet desa via BUMDes.',
+      sumber: 'Podes 2025 (daftar fasilitas)',
     });
   }
 
@@ -385,6 +467,88 @@ export function kumpulkanTemuan(desa: Desa, posisi: PosisiIdm | null): Temuan[] 
     }
   }
 
+  if (!out.some((t) => t.id === 'lahan_kritis') && desa.lahan_kritis_status === 'Lahan Kritis' && !(kritis && kritis > 0)) {
+    out.push({
+      id: 'lahan_kritis',
+      jenis: 'masalah',
+      tingkat: 'sedang',
+      pilar: 'Ketahanan Lingkungan',
+      judul: 'Desa berstatus lahan kritis',
+      nilai: 'Lahan Kritis',
+      pembanding: 'Status KLHK',
+      penjelasan: 'Sebagian wilayah desa tergolong lahan kritis, tetapi luasnya tidak tercatat.',
+      saran: 'Verifikasi luas & lokasi di lapangan; usulkan rehabilitasi lewat BPDAS/Dinas Lingkungan Hidup.',
+      sumber: 'KLHK (lahan kritis)',
+    });
+  }
+
+  // Susenas — agregat KABUPATEN, jadi tingkatnya dibatasi "tinggi"
+  // dan judulnya selalu menyebut kabupaten supaya tidak dibaca sebagai data desa.
+  const s = tambahan.susenas?.tersedia ? tambahan.susenas : null;
+  if (s) {
+    const ind: {
+      id: string; kolom: string; arah: 'naik_buruk' | 'turun_buruk'; tinggi: number; sedang: number;
+      pilar: string; judul: string; pembanding: string; penjelasan: string; saran: string;
+    }[] = [
+      {
+        id: 'pangan', kolom: 'khawatir_makan_pct', arah: 'naik_buruk', tinggi: 30, sedang: 15,
+        pilar: 'Ketahanan Sosial', judul: 'Rawan pangan di tingkat kabupaten',
+        pembanding: 'Waspada bila > 15% RT khawatir tidak cukup makan',
+        penjelasan: 'rumah tangga di kabupaten ini khawatir tidak cukup makan dalam setahun terakhir — tanda kerawanan pangan yang berkaitan dengan stunting.',
+        saran: 'Kaitkan program dengan pekarangan pangan lestari, PMT lokal, dan lumbung pangan desa.',
+      },
+      {
+        id: 'sanitasi', kolom: 'punya_toilet_pct', arah: 'turun_buruk', tinggi: 70, sedang: 90,
+        pilar: 'Ketahanan Lingkungan', judul: 'Kepemilikan jamban rendah di kabupaten',
+        pembanding: 'Target STBM: 100% RT punya jamban sehat',
+        penjelasan: 'rumah tangga di kabupaten ini punya fasilitas buang air sendiri; sisanya berisiko BAB sembarangan yang mencemari sumber air.',
+        saran: 'Padukan program air bersih dengan pemicuan STBM dan jamban sehat keluarga.',
+      },
+      {
+        id: 'kekurangan_air', kolom: 'kekurangan_air_pct', arah: 'naik_buruk', tinggi: 20, sedang: 10,
+        pilar: 'Ketahanan Lingkungan', judul: 'Sering kekurangan air minum di kabupaten',
+        pembanding: 'Waspada bila > 10% RT pernah kekurangan air',
+        penjelasan: 'rumah tangga di kabupaten ini pernah kekurangan air minum — menunjukkan masalah ketersediaan, bukan hanya akses.',
+        saran: 'Utamakan penampungan dan konservasi sumber air, bukan hanya jaringan pipa.',
+      },
+      {
+        id: 'listrik', kolom: 'listrik_pln_pct', arah: 'turun_buruk', tinggi: 80, sedang: 95,
+        pilar: 'Ketahanan Ekonomi', judul: 'Akses listrik PLN belum merata di kabupaten',
+        pembanding: 'Target rasio elektrifikasi: 100%',
+        penjelasan: 'rumah tangga di kabupaten ini memakai listrik PLN; sisanya bergantung pada genset/tenaga surya atau belum berlistrik.',
+        saran: 'Pastikan sarana yang dibangun (pompa, cold storage) punya sumber energi; pertimbangkan PLTS komunal.',
+      },
+      {
+        id: 'buta_huruf', kolom: 'buta_huruf_pct', arah: 'naik_buruk', tinggi: 10, sedang: 5,
+        pilar: 'Ketahanan Sosial', judul: 'Angka buta huruf tinggi di kabupaten',
+        pembanding: 'Waspada bila > 5% penduduk',
+        penjelasan: 'penduduk di kabupaten ini tidak bisa membaca-menulis — materi pelatihan berbasis teks tidak akan efektif.',
+        saran: 'Gunakan pelatihan praktik/visual dan sisipkan keaksaraan fungsional.',
+      },
+    ];
+    for (const x of ind) {
+      const v = num(s[x.kolom]);
+      if (v == null) continue;
+      const tingkat: TingkatTemuan =
+        x.arah === 'naik_buruk'
+          ? v > x.tinggi ? 'tinggi' : v > x.sedang ? 'sedang' : 'baik'
+          : v < x.tinggi ? 'tinggi' : v < x.sedang ? 'sedang' : 'baik';
+      if (tingkat === 'baik') continue;
+      out.push({
+        id: x.id,
+        jenis: 'masalah',
+        tingkat,
+        pilar: x.pilar,
+        judul: x.judul,
+        nilai: fmtPct(v),
+        pembanding: x.pembanding,
+        penjelasan: `${fmtPct(v)} ${x.penjelasan}`,
+        saran: x.saran,
+        sumber: 'Susenas 2025 (tingkat kabupaten)',
+      });
+    }
+  }
+
   // Urut: masalah dulu (paling parah di atas), lalu kekuatan
   return out.sort((a, b) => {
     if (a.jenis !== b.jenis) return a.jenis === 'masalah' ? -1 : 1;
@@ -411,7 +575,7 @@ const PROGRAM: Record<string, ProgramInfo> = {
   water_system: {
     bidang: 'Air bersih & sanitasi',
     pilar: 'Ketahanan Lingkungan',
-    dasar: ['air', 'pilar_ikl'],
+    dasar: ['air', 'kekurangan_air', 'sanitasi', 'pilar_ikl'],
     tujuan: 'Memperluas akses air bersih yang aman dan berkelanjutan bagi rumah tangga yang belum terlayani.',
     langkahFisik: [
       'Survei sumber air (debit, kualitas) dan peta RT yang belum terlayani bersama perangkat dusun.',
@@ -435,7 +599,7 @@ const PROGRAM: Record<string, ProgramInfo> = {
   health_infrastructure: {
     bidang: 'Layanan kesehatan',
     pilar: 'Ketahanan Sosial',
-    dasar: ['faskes', 'pilar_iks', 'miskin'],
+    dasar: ['faskes', 'posyandu', 'pangan', 'pilar_iks'],
     tujuan: 'Mendekatkan layanan kesehatan dasar dan menurunkan risiko stunting serta kematian ibu–anak.',
     langkahFisik: [
       'Tetapkan lokasi Poskesdes/Pustu di titik yang terjangkau mayoritas dusun; pastikan status lahan jelas.',
@@ -459,7 +623,7 @@ const PROGRAM: Record<string, ProgramInfo> = {
   education_infrastructure: {
     bidang: 'Pendidikan',
     pilar: 'Ketahanan Sosial',
-    dasar: ['sd', 'smp', 'smp_plus'],
+    dasar: ['paud', 'sd', 'smp', 'sma', 'smp_plus', 'buta_huruf'],
     tujuan: 'Menjaga anak tetap bersekolah hingga tamat SMP dan menaikkan kualitas belajar.',
     langkahFisik: [
       'Verifikasi data siswa & sekolah di Dapodik; pastikan kebutuhan ruang kelas nyata, bukan perkiraan.',
@@ -483,7 +647,7 @@ const PROGRAM: Record<string, ProgramInfo> = {
   livelihood_diversification: {
     bidang: 'Ekonomi & mata pencaharian',
     pilar: 'Ketahanan Ekonomi',
-    dasar: ['pertanian', 'miskin', 'pilar_ike'],
+    dasar: ['pertanian', 'miskin', 'pangan', 'lahan_kritis', 'digital', 'pilar_ike'],
     tujuan: 'Menaikkan dan menstabilkan pendapatan keluarga lewat nilai tambah produk dan usaha baru.',
     langkahFisik: [
       'Pilih 1–2 komoditas unggulan berdasarkan volume produksi dan permintaan pasar.',
@@ -801,57 +965,162 @@ const TIER_MAKNA: Record<Tier, string> = {
   MICRO: 'hanya cukup untuk edukasi, sosialisasi, dan penjangkauan langsung',
 };
 
+// ─── Keterkaitan antar-temuan ────────────────────────────────────────
+
+/**
+ * Aturan sebab-akibat sederhana: temuan yang muncul bersamaan dan saling
+ * memperparah. Inilah "analisis" yang tidak terlihat dari angka satu per satu.
+ */
+export function analisisKeterkaitan(temuan: Temuan[]): Keterkaitan[] {
+  const m = new Map(temuan.filter((t) => t.jenis === 'masalah').map((t) => [t.id, t]));
+  const k = new Map(temuan.filter((t) => t.jenis === 'kekuatan').map((t) => [t.id, t]));
+  const ada = (...ids: string[]) => ids.filter((id) => m.has(id));
+  const sebut = (ids: string[]) => ids.map((id) => sebutTemuan((m.get(id) ?? k.get(id))!)).join(', ');
+  const out: Keterkaitan[] = [];
+
+  const lingkungan = ada('air', 'sanitasi', 'kekurangan_air');
+  const kesehatan = ada('faskes', 'posyandu', 'pangan');
+  if (lingkungan.length && kesehatan.length) {
+    out.push({
+      judul: 'Air, sanitasi, dan kesehatan saling memperparah',
+      isi:
+        `Kondisi ${sebut(lingkungan)} memicu diare berulang yang menghambat penyerapan gizi anak, ` +
+        `sementara ${sebut(kesehatan)} membuat masalah itu terlambat terdeteksi. Kombinasi ini adalah jalur klasik stunting — ` +
+        'program air bersih dan kesehatan sebaiknya menyasar dusun yang sama dan dijalankan bersamaan.',
+      temuan: [...lingkungan, ...kesehatan],
+    });
+  }
+
+  const lahan = ada('lahan_kritis', 'kekurangan_air');
+  if (m.has('pertanian') && lahan.length) {
+    out.push({
+      judul: 'Mata pencaharian bergantung pada lahan yang menurun',
+      isi:
+        `Sebagian besar warga hidup dari pertanian, padahal ${sebut(lahan)}. ` +
+        'Tanpa pemulihan lahan dan air, pendapatan akan terus tertekan — program ekonomi perlu disertai konservasi (agroforestri, embung, terasering).',
+      temuan: ['pertanian', ...lahan],
+    });
+  }
+
+  const sdm = ada('smp_plus', 'buta_huruf');
+  const ekonomi = ada('pertanian', 'miskin', 'pilar_ike');
+  if (sdm.length && ekonomi.length) {
+    out.push({
+      judul: 'Pelatihan ekonomi harus menyesuaikan tingkat pendidikan',
+      isi:
+        `Dengan ${sebut(sdm)}, pelatihan berbasis modul tertulis akan sulit diserap. ` +
+        'Pakai metode praktik langsung, demplot, dan pendampingan per kelompok kecil.',
+      temuan: [...sdm, ...ekonomi.slice(0, 1)],
+    });
+  }
+
+  const sekolah = ada('paud', 'sd', 'smp', 'sma');
+  if (sekolah.length && m.has('smp_plus')) {
+    out.push({
+      judul: 'Rendahnya pendidikan berkaitan dengan sekolah yang tidak tersedia',
+      isi:
+        `${besarAwal(sebut(['smp_plus']))} sejalan dengan ${sebut(sekolah)}. ` +
+        'Biaya dan jarak ke sekolah lanjutan di luar desa menjadi penghambat; bantuan transportasi/asrama sering lebih cepat berdampak daripada membangun gedung.',
+      temuan: ['smp_plus', ...sekolah],
+    });
+  }
+
+  if (m.has('miskin') && m.has('pangan')) {
+    out.push({
+      judul: 'Kemiskinan dan kerawanan pangan bertumpuk',
+      isi:
+        `${besarAwal(sebut(['miskin', 'pangan']))}. Rumah tangga di rumah tidak layak huni kemungkinan besar juga rawan pangan — ` +
+        'gunakan data yang sama (DTKS/P3KE) untuk menyasar bantuan pangan dan perbaikan rumah ke keluarga yang sama.',
+      temuan: ['miskin', 'pangan'],
+    });
+  }
+
+  const ekonomiLemah = ada('pilar_ike', 'pertanian', 'miskin');
+  if (k.has('hutan') && ekonomiLemah.length) {
+    out.push({
+      judul: 'Hutan bisa menjadi sumber penghasilan alternatif',
+      isi:
+        `Desa memiliki ${sebut(['hutan'])} sementara ${sebut(ekonomiLemah.slice(0, 1))}. ` +
+        'Skema Perhutanan Sosial dan hasil hutan bukan kayu dapat menambah pendapatan tanpa merusak hutan.',
+      temuan: ['hutan', ...ekonomiLemah.slice(0, 1)],
+    });
+  }
+
+  if (m.has('digital') && ada('pertanian', 'pilar_ike').length) {
+    out.push({
+      judul: 'Akses pasar terhambat oleh keterbatasan telekomunikasi',
+      isi:
+        'Tanpa sinyal/internet yang memadai, petani dan pelaku usaha sulit memantau harga dan menjual langsung ke pembeli, ' +
+        'sehingga bergantung pada tengkulak. Pemasaran bersama lewat BUMDes dapat menjadi jembatan.',
+      temuan: ['digital', ...ada('pertanian', 'pilar_ike').slice(0, 1)],
+    });
+  }
+
+  // Tampilkan hanya pola yang melibatkan masalah serius (atau peluang dari
+  // kekuatan desa), maksimal 4 — lebih dari itu justru mengaburkan prioritas.
+  const serius = (id: string) => ['kritis', 'tinggi'].includes(m.get(id)?.tingkat ?? '');
+  return out
+    .filter((x) => x.temuan.some((id) => serius(id) || k.has(id)))
+    .sort((a, b) => b.temuan.filter(serius).length - a.temuan.filter(serius).length)
+    .slice(0, 4);
+}
+
 export function diagnosaDesa(
   desa: Desa,
   anggaran: number,
   estimasi: number,
   tier: Tier,
   kegiatanPerKey: Record<string, string[]>,
+  tambahan: DataTambahan = {},
 ): Diagnosis {
   const posisi = posisiIdm(desa);
-  const temuan = kumpulkanTemuan(desa, posisi);
+  const temuan = kumpulkanTemuan(desa, posisi, tambahan);
   const program = susunProgram(desa, anggaran, tier, kegiatanPerKey, temuan);
+  const keterkaitan = analisisKeterkaitan(temuan);
 
   const masalah = temuan.filter((t) => t.jenis === 'masalah');
   const kekuatan = temuan.filter((t) => t.jenis === 'kekuatan');
-  const coverage = estimasi > 0 ? (anggaran / estimasi) * 100 : 0;
 
+  // Masalah serius yang tidak tersentuh program mana pun di paket ini —
+  // harus disebut terang supaya pengguna tahu perlu sumber dana lain.
+  const tercakup = new Set(program.flatMap((p) => PROGRAM[p.key]?.dasar ?? []));
+  const tidakTercakup = program.length
+    ? masalah
+        .filter((t) => !t.id.startsWith('pilar_') && (t.tingkat === 'kritis' || t.tingkat === 'tinggi'))
+        .filter((t) => !tercakup.has(t.id))
+        .map((t) => t.id)
+    : [];
+
+  // Ringkasan sengaja TIDAK mengulang skor IDM/cakupan — keduanya sudah ada
+  // di kartu angka di atasnya. Isinya kesimpulan, bukan angka ulang.
   const ringkasan: string[] = [];
-  if (posisi) {
-    const terlemah = posisi.pilar.find((p) => p.kode === posisi.pilarTerlemah);
-    ringkasan.push(
-      `Berstatus ${posisi.status} (IDM ${fmtSkor(posisi.skor)})` +
-        (posisi.statusBerikut
-          ? `; butuh +${fmtSkor(posisi.selisihKeBerikut)} poin untuk naik ke ${posisi.statusBerikut}.`
-          : '.') +
-        (terlemah ? ` Pilar terlemah: ${terlemah.label} (${fmtSkor(terlemah.nilai)}).` : ''),
-    );
-  }
-  const mendesak = masalah.filter((t) => t.tingkat === 'kritis' || t.tingkat === 'tinggi' || t.tingkat === 'sedang')
-    .filter((t) => !t.id.startsWith('pilar_'))
-    .slice(0, 3);
+  const mendesak = masalah.filter((t) => !t.id.startsWith('pilar_')).slice(0, 3);
   if (mendesak.length) {
     ringkasan.push(
-      `Masalah paling mendesak: ${mendesak
-        .map((t) => (t.nilai === 'Tidak ada' ? t.judul.toLowerCase() : `${t.judul.toLowerCase()} (${t.nilai})`))
-        .join('; ')}.`,
+      `Masalah paling mendesak: ${mendesak.map(sebutTemuan).join('; ')}.`,
     );
+  }
+  if (keterkaitan.length) {
+    ringkasan.push(`Pola utama: ${kecilAwal(keterkaitan[0].judul)} — lihat bagian Temuan.`);
   }
   const kurang = Math.max(0, estimasi - anggaran);
   ringkasan.push(
-    `Anggaran ${rupiahRingkas(anggaran)} menutup ${fmtPct(coverage)} kebutuhan ideal ${rupiahRingkas(estimasi)}` +
-      (kurang > 0 ? ` (kurang ${rupiahRingkas(kurang)})` : '') +
-      ` — ${TIER_MAKNA[tier]}.`,
+    (kurang > 0 ? `Masih kurang ${rupiahRingkas(kurang)} dari kebutuhan ideal, jadi anggaran ini ` : 'Anggaran ini ') +
+      `${TIER_MAKNA[tier]}.`,
   );
   const utama = program[0];
   if (utama && utama.key !== 'monitoring') {
     ringkasan.push(
-      `Prioritas #1: ${utama.bidang} — alokasikan ${rupiahRingkas(utama.alokasi)} (${fmtPct(utama.porsiPct)}) ` +
+      `Prioritas #1: ${utama.bidang} — ${rupiahRingkas(utama.alokasi)} ` +
         `untuk ${utama.kegiatan[0].charAt(0).toLowerCase()}${utama.kegiatan[0].slice(1)}.`,
     );
   }
+  if (tidakTercakup.length) {
+    const judul = tidakTercakup.map((id) => kecilAwal(temuan.find((t) => t.id === id)!.judul));
+    ringkasan.push(`Belum tertangani paket ini: ${judul.join('; ')} — perlu diusulkan lewat sumber dana lain.`);
+  }
   if (kekuatan.length) {
-    ringkasan.push(`Modal yang bisa dimanfaatkan: ${kekuatan.slice(0, 2).map((t) => t.judul.toLowerCase()).join('; ')}.`);
+    ringkasan.push(`Modal yang bisa dimanfaatkan: ${kekuatan.slice(0, 2).map((t) => kecilAwal(t.judul)).join('; ')}.`);
   }
 
   const catatanData: string[] = [];
@@ -861,12 +1130,22 @@ export function diagnosaDesa(
   if (num(desa.pct_air_bersih) == null) catatanData.push('Data akses air bersih tidak tersedia.');
   if (num(desa.jumlah_rt) == null) catatanData.push('Jumlah rumah tangga tidak tersedia; sasaran per RT tidak dapat dihitung.');
   if (num(desa.idm) == null) catatanData.push('Skor IDM 2024 tidak tersedia.');
+  if (!tambahan.infra?.tersedia) {
+    catatanData.push('Daftar fasilitas Podes 2025 tidak tersedia; ketersediaan sekolah/faskes memakai indikator ringkas (ada/tidak).');
+  }
+  if (tambahan.susenas?.tersedia) {
+    catatanData.push('Indikator Susenas (pangan, sanitasi, listrik, buta huruf, kekurangan air) adalah rata-rata KABUPATEN, bukan angka desa ini.');
+  } else {
+    catatanData.push('Data Susenas tidak tersedia untuk kabupaten ini; analisis pangan dan sanitasi tidak disertakan.');
+  }
   catatanData.push(
-    'Biaya satuan (air Rp 5 jt/RT, rumah Rp 3 jt/RT, SD/SMP Rp 500 jt, faskes Rp 750 jt) adalah asumsi model — perlu dikoreksi dengan RAB lokal.',
+    'Biaya satuan (air Rp 5 jt/RT, rumah Rp 3 jt/RT, SD/SMP Rp 500 jt, faskes Rp 750 jt) dan ambang tingkat keparahan adalah asumsi model — perlu dikoreksi dengan kondisi lokal.',
   );
 
   return {
     ringkasan,
+    keterkaitan,
+    tidakTercakup,
     posisiIdm: posisi,
     temuan,
     program,

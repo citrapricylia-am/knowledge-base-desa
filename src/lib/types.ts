@@ -104,6 +104,24 @@ export interface RincianBiayaPayload {
   total: number;
 }
 
+/** Agregat Susenas per KABUPATEN (bukan desa). Angka pg bisa tiba sebagai string. */
+export interface SusenasKabupaten {
+  tersedia: boolean;
+  pesan?: string;
+  r101?: string;
+  r102?: string;
+  [kolom: string]: number | string | boolean | null | undefined;
+}
+
+/** Fasilitas tercatat di Podes 2025 untuk satu desa. */
+export interface InfraDesa {
+  tersedia: boolean;
+  total: number;
+  fasilitas: Record<string, { label: string; nama: string }[]>;
+  /** Jumlah per label fasilitas, mis. { SD: 2, MI: 1, Posyandu: 4 } */
+  jumlah: Record<string, number>;
+}
+
 export type TingkatTemuan = 'kritis' | 'tinggi' | 'sedang' | 'baik';
 
 /** Satu temuan hasil diagnosis: masalah atau kekuatan desa, lengkap dengan pembanding. */
@@ -169,8 +187,18 @@ export interface TahapanPelaksanaan {
   kegiatan: string[];
 }
 
+/** Hubungan sebab-akibat antar beberapa temuan. */
+export interface Keterkaitan {
+  judul: string;
+  isi: string;
+  temuan: string[];
+}
+
 export interface Diagnosis {
   ringkasan: string[];
+  keterkaitan: Keterkaitan[];
+  /** id temuan serius yang tidak tertangani program mana pun di paket ini */
+  tidakTercakup: string[];
   posisiIdm: PosisiIdm | null;
   temuan: Temuan[];
   program: ProgramRekomendasi[];
@@ -190,6 +218,8 @@ export interface AnalisisPayload {
   podes_tersedia: boolean;
   rincian_biaya: RincianBiayaPayload;
   diagnosis: Diagnosis;
+  susenas: SusenasKabupaten | null;
+  infra: InfraDesa | null;
 }
 
 export interface AnalisisResponse {

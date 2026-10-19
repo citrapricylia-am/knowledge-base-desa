@@ -7,6 +7,7 @@
  */
 import assert from 'node:assert/strict';
 import { diagnosaDesa, posisiIdm, kumpulkanTemuan } from '../src/lib/diagnosis';
+import { kelompokkanInfra } from '../src/lib/dataDesa';
 import { rincianEstimasiBiaya } from '../src/lib/analisis';
 import { getTier, buildTemplateNarasi, desaToLlmData, ringkasDiagnosis } from '../src/lib/llm';
 import type { Desa } from '../src/lib/types';
@@ -142,6 +143,67 @@ uji('ringkasan diagnosis untuk prompt memuat program & alokasi', () => {
   assert.match(teks, /PROGRAM BERPRIORITAS/);
   assert.match(teks, /1\. Air bersih & sanitasi — alokasi Rp/);
   assert.ok(!/\d\.\d{4}/.test(teks), 'angka desimal harus koma, bukan titik');
+});
+
+// Fasilitas Podes: desa punya MI (bukan SD) dan Polindes, tanpa posyandu/PAUD/SMA.
+const infra = kelompokkanInfra([
+  { jenis: 'r701ck3', nama: 'MI Nurul Huda' },
+  { jenis: 'r701dk3', nama: 'MTs Al-Ikhlas' },
+  { jenis: 'r702dk2', nama: 'Polindes Bakongan' },
+]);
+// Susenas kabupaten: angka datang sebagai string dari pg
+const susenas = {
+  tersedia: true,
+  khawatir_makan_pct: '34.2',
+  punya_toilet_pct: '82.0',
+  listrik_pln_pct: '99.1',
+  buta_huruf_pct: '3.0',
+  kekurangan_air_pct: '12.5',
+};
+
+uji('infra: MI dihitung sebagai SD, Polindes sebagai faskes — tidak dilaporkan "belum ada"', () => {
+  const t = kumpulkanTemuan(desa, posisiIdm(desa), { infra });
+  assert.ok(!t.some((x) => x.id === 'sd'));
+  assert.ok(!t.some((x) => x.id === 'smp'), 'MTs = SMP, flag ada_smp=0 di tabel desa diabaikan');
+  assert.ok(!t.some((x) => x.id === 'faskes'), 'Polindes = faskes, flag ada_faskes=0 diabaikan');
+  assert.ok(t.some((x) => x.id === 'posyandu' && x.tingkat === 'tinggi'));
+  assert.ok(t.some((x) => x.id === 'paud'));
+  assert.ok(t.some((x) => x.id === 'sma'));
+  assert.ok(t.some((x) => x.id === 'digital'));
+  assert.ok(t.some((x) => x.id === 'faskes_ada' && x.nilai === '1 Polindes'));
+});
+
+uji('susenas kabupaten: hanya yang melewati ambang yang jadi temuan, dan berlabel kabupaten', () => {
+  const t = kumpulkanTemuan(desa, posisiIdm(desa), { susenas });
+  const pangan = t.find((x) => x.id === 'pangan')!;
+  assert.equal(pangan.tingkat, 'tinggi');
+  assert.match(pangan.sumber, /kabupaten/);
+  assert.equal(t.find((x) => x.id === 'sanitasi')!.tingkat, 'sedang'); // 82% < 90%
+  assert.equal(t.find((x) => x.id === 'kekurangan_air')!.tingkat, 'sedang');
+  assert.ok(!t.some((x) => x.id === 'listrik')); // 99,1% baik
+  assert.ok(!t.some((x) => x.id === 'buta_huruf')); // 3% baik
+});
+
+uji('keterkaitan: air buruk + rawan pangan/posyandu → jalur stunting; tani + lahan kritis', () => {
+  const d = diagnosaDesa(desa, 500_000_000, estimasi, 'MEDIUM', kegiatanPerKey, { infra, susenas });
+  const judul = d.keterkaitan.map((k) => k.judul);
+  assert.ok(judul.some((j) => j.startsWith('Air, sanitasi, dan kesehatan')), judul.join(' | '));
+  assert.ok(judul.some((j) => j.startsWith('Mata pencaharian bergantung')));
+  assert.ok(d.keterkaitan.every((k) => k.temuan.every((id) => d.temuan.some((t) => t.id === id))));
+});
+
+uji('tidak tercakup: masalah serius tanpa program ditandai (posyandu tercakup kesehatan)', () => {
+  const d = diagnosaDesa(desa, 500_000_000, estimasi, 'MEDIUM', kegiatanPerKey, { infra, susenas });
+  assert.ok(!d.tidakTercakup.includes('posyandu'));
+  assert.ok(!d.tidakTercakup.includes('air'));
+  // tidak ada program ekonomi di paket → lahan kritis (tinggi) di luar paket
+  assert.ok(d.tidakTercakup.includes('lahan_kritis'), d.tidakTercakup.join(','));
+  assert.ok(d.ringkasan.some((r) => r.startsWith('Belum tertangani paket ini')));
+});
+
+uji('ringkasan tidak mengulang skor IDM atau persen cakupan (sudah di kartu angka)', () => {
+  const d = diagnosaDesa(desa, 500_000_000, estimasi, 'MEDIUM', kegiatanPerKey, { infra, susenas });
+  assert.ok(!d.ringkasan.some((r) => /IDM \d|0,6512|menutup \d/.test(r)), d.ringkasan.join('\n'));
 });
 
 console.log(`\n${lulus} uji lulus`);

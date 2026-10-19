@@ -11,8 +11,9 @@ import {
   Wallet,
   Sparkles,
   CalendarRange,
+  CircleAlert,
 } from 'lucide-react';
-import type { NarasiItem, ProgramRekomendasi, TahapanPelaksanaan } from '@/lib/types';
+import type { NarasiItem, ProgramRekomendasi, TahapanPelaksanaan, Temuan } from '@/lib/types';
 import { formatPct, formatRp, urgensiColor } from '@/lib/format';
 
 const WARNA_PROGRAM = ['bg-sky-400', 'bg-emerald-400', 'bg-violet-400', 'bg-amber-400', 'bg-rose-400', 'bg-teal-400'];
@@ -187,12 +188,15 @@ export default function RencanaAksiPanel({
   program,
   tahapan,
   anggaran,
+  tidakTercakup,
   catatanAi,
   sedangMenyusun,
 }: {
   program: ProgramRekomendasi[];
   tahapan: TahapanPelaksanaan[];
   anggaran: number;
+  /** Masalah serius yang tidak ditangani program mana pun di paket ini */
+  tidakTercakup: Temuan[];
   catatanAi: Record<string, NarasiItem>;
   sedangMenyusun?: boolean;
 }) {
@@ -250,6 +254,27 @@ export default function RencanaAksiPanel({
           />
         ))}
       </div>
+
+      {tidakTercakup.length > 0 && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.05] p-4 space-y-2">
+          <h3 className="text-sm font-semibold text-amber-200 flex items-center gap-1.5">
+            <CircleAlert className="w-4 h-4" />
+            Masalah serius di luar paket ini
+          </h3>
+          <p className="text-xs text-white/55 leading-relaxed">
+            Paket kegiatan mengikuti rekomendasi Podes, sehingga masalah berikut belum tersentuh. Usulkan lewat
+            musrenbang, Dana Desa, atau program dinas terkait.
+          </p>
+          <ul className="space-y-1.5">
+            {tidakTercakup.map((t) => (
+              <li key={t.id} className="text-sm text-white/75 leading-snug">
+                <span className="font-medium">{t.judul}</span>
+                <span className="text-white/45"> — {t.saran}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {tahapan.length > 0 && (
         <div className="space-y-3 pt-1">

@@ -9,16 +9,15 @@ Berdasarkan data yang diberikan (Podes 2025, IDM 2024, dan Susenas 2025) dan HAS
 
 STRUKTUR OUTPUT WAJIB (JSON valid, tanpa teks di luar JSON):
 {
-  "konteks": "Analisis situasi desa 5-7 kalimat. Jelaskan: posisi IDM, jarak ke status berikutnya, pilar terlemah dan PENYEBABNYA menurut data, kondisi demografi, dan kondisi lingkungan (hutan/lahan kritis) jika tersedia. Hubungkan temuan antar sumber (misal air bersih rendah ↔ risiko kesehatan).",
-  "posisi_anggaran": "Analisis posisi anggaran 3-5 kalimat. Jelaskan: persentase cakupan, apa yang bisa/tidak bisa dibiayai dengan anggaran ini, mengapa urutan prioritas seperti di diagnosis, dan sumber dana pelengkap untuk menutup kekurangan.",
+  "konteks": "Interpretasi 4-6 kalimat: MENGAPA desa berada di kondisi ini. Jelaskan rantai sebab-akibat antar temuan (misal pendidikan rendah → pekerjaan terbatas → kemiskinan), apa yang paling menahan kemajuan, dan apa yang khas dari desa ini dibanding desa lain. JANGAN mengulang skor IDM, status, atau persentase cakupan anggaran — pengguna sudah melihatnya di kartu angka.",
+  "posisi_anggaran": "Strategi anggaran 3-4 kalimat: apa yang TIDAK bisa dibiayai dengan anggaran ini dan konsekuensinya, urutan pelaksanaan yang masuk akal, dan sumber dana pelengkap konkret untuk menutup kekurangan. JANGAN mengulang daftar alokasi per program.",
   "rekomendasi": [
     {
       "judul": "Nama BIDANG persis seperti di daftar PROGRAM BERPRIORITAS (misal 'Air bersih & sanitasi')",
       "poin": [
-        "Mengapa diprioritaskan — kaitkan ke angka spesifik dari data (maks 2 kalimat)",
-        "Cara pelaksanaan konkret untuk desa ini: siapa sasaran, di mana mulai, metode (maks 2 kalimat)",
-        "Dampak yang diharapkan pada pilar IDM dan indikator pengukurnya (maks 2 kalimat)",
-        "Risiko utama di desa ini dan cara mengantisipasinya (maks 2 kalimat)"
+        "Hal khas desa ini yang harus diperhatikan saat melaksanakan program (maks 2 kalimat)",
+        "Keterkaitan dengan program lain atau kekuatan desa yang bisa dimanfaatkan (maks 2 kalimat)",
+        "Tanda awal keberhasilan/kegagalan yang perlu dipantau di 3 bulan pertama (maks 2 kalimat)"
       ]
     }
   ],
@@ -33,7 +32,8 @@ ATURAN:
 5. Jika data Susenas tersedia, gunakan untuk memperkaya analisis (misal: "39% rumah tangga khawatir kehabisan makan, mengindikasikan tekanan pada pilar sosial").
 6. Data Susenas adalah agregat KABUPATEN, bukan desa — sebut "di tingkat kabupaten" saat memakainya.
 7. Hindari kalimat generik ("libatkan masyarakat", "sesuaikan kondisi lapangan") kecuali disertai hal spesifik untuk desa ini.
-8. Output HANYA JSON valid. Tanpa salam, tanpa markdown, tanpa teks di luar JSON.`;
+8. Langkah, indikator, mitra, dan risiko standar tiap program SUDAH ditampilkan ke pengguna — jangan diulang. Tambahkan hanya wawasan yang tidak ada di hasil diagnosis.
+9. Output HANYA JSON valid. Tanpa salam, tanpa markdown, tanpa teks di luar JSON.`;
 
 export interface DesaData {
   nama_desa: string;
@@ -211,6 +211,13 @@ export function ringkasDiagnosis(d: Diagnosis): string {
     baris.push('KEKUATAN DESA:');
     for (const t of kekuatan) baris.push(`- ${t.judul}: ${t.nilai}`);
   }
+  if (d.keterkaitan.length) {
+    baris.push('KETERKAITAN ANTAR-TEMUAN (sudah ditampilkan):');
+    for (const k of d.keterkaitan) baris.push(`- ${k.judul}`);
+  }
+  if (d.tidakTercakup.length) {
+    baris.push(`MASALAH SERIUS DI LUAR PAKET: ${d.tidakTercakup.join(', ')}`);
+  }
   if (d.program.length) {
     baris.push('PROGRAM BERPRIORITAS:');
     for (const p of d.program) {
@@ -270,19 +277,13 @@ export function buildTemplateNarasi(
   if (diagnosis?.program.length) {
     const pctFmt = (n: number) =>
       `${n.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
-    const masalah = diagnosis.temuan.filter((t) => t.jenis === 'masalah' && !t.id.startsWith('pilar_'));
     return {
       konteks: [
         `${desa.nama_desa} di Kecamatan ${desa.nama_kecamatan}, Kabupaten ${desa.nama_kabupaten} ` +
           `memiliki ${desa.jumlah_jiwa?.toLocaleString('id-ID') ?? '?'} jiwa dalam ` +
           `${desa.jumlah_rt?.toLocaleString('id-ID') ?? '?'} rumah tangga.`,
         diagnosis.posisiIdm?.penjelasan ?? '',
-        masalah.length
-          ? `Temuan utama: ${masalah
-              .slice(0, 3)
-              .map((t) => (t.nilai === 'Tidak ada' ? t.judul.toLowerCase() : `${t.judul.toLowerCase()} (${t.nilai})`))
-              .join('; ')}.`
-          : '',
+        ...diagnosis.keterkaitan.slice(0, 2).map((k) => k.isi),
       ].filter(Boolean).join(' '),
       posisi_anggaran:
         `Anggaran ${rp(anggaran)} setara ${pctFmt(coverage)} dari estimasi kebutuhan ideal ${rp(desa.estimasi_biaya)}, ` +

@@ -17,6 +17,8 @@ interface NarasiPanelProps {
   sedangMenyusun?: boolean;
   /** Narasi gagal disusun — angka tetap tampil, narasi diberi pesan. */
   gagalMenyusun?: boolean;
+  /** Narasi template: paragrafnya duplikat panel diagnosis, jadi hanya rekomendasiLain yang tampil. */
+  sembunyikanParagraf?: boolean;
 }
 
 /**
@@ -65,7 +67,7 @@ function pecahParagraf(teks: string): string[] {
   return blok.length ? blok : [teks];
 }
 
-export default function NarasiPanel({ narasi, sumber, rekomendasiLain = [], sedangMenyusun, gagalMenyusun }: NarasiPanelProps) {
+export default function NarasiPanel({ narasi, sumber, rekomendasiLain = [], sedangMenyusun, gagalMenyusun, sembunyikanParagraf }: NarasiPanelProps) {
   const [openIdx, setOpenIdx] = useState<number | null>(0);
 
   const badge =
@@ -86,16 +88,17 @@ export default function NarasiPanel({ narasi, sumber, rekomendasiLain = [], seda
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-white">Analisis naratif</h2>
+        <h2 className="text-base font-semibold text-white">Interpretasi analis AI</h2>
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs ${badge.className}`}>
           <Icon className="w-3.5 h-3.5" />
           {badge.label}
         </span>
       </div>
 
+      {!sembunyikanParagraf && (<>
       {/* === KONTEKS DESA === */}
       <div className="rounded-xl border border-white/5 bg-white/[0.03] p-5 space-y-3">
-        <h4 className="text-xs uppercase tracking-wide text-white/50">Konteks desa</h4>
+        <h4 className="text-xs uppercase tracking-wide text-white/50">Mengapa kondisi desa seperti ini</h4>
         {sedangMenyusun ? (
           <div className="space-y-2.5" aria-live="polite" aria-busy="true">
             <div className="h-3 rounded bg-white/[0.07] animate-pulse" style={{ width: '94%' }} />
@@ -117,7 +120,7 @@ export default function NarasiPanel({ narasi, sumber, rekomendasiLain = [], seda
 
       {/* === POSISI ANGGARAN === */}
       <div className="rounded-xl border border-white/5 bg-white/[0.03] p-5 space-y-3">
-        <h4 className="text-xs uppercase tracking-wide text-white/50">Posisi anggaran</h4>
+        <h4 className="text-xs uppercase tracking-wide text-white/50">Strategi anggaran</h4>
         {sedangMenyusun ? (
           <div className="space-y-2.5">
             <div className="h-3 rounded bg-white/[0.07] animate-pulse" style={{ width: '90%' }} />
@@ -131,6 +134,8 @@ export default function NarasiPanel({ narasi, sumber, rekomendasiLain = [], seda
           ))
         )}
       </div>
+
+      </>)}
 
       {/* === REKOMENDASI === */}
       {!sedangMenyusun && rekomendasiLain.length > 0 && (

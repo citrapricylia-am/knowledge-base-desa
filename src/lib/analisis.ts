@@ -1,9 +1,10 @@
 import { query } from './db';
 import { desaToLlmData, generateNarasi, getTier, type SusenasData } from './llm';
+import { ambilInfra, ambilSusenas } from './dataDesa';
 import { getCachedNarasi, setCachedNarasi } from './cache';
 import { diagnosaDesa } from './diagnosis';
 import { labelIdm } from './format';
-import type { AnalisisPayload, Desa, Tier } from './types';
+import type { AnalisisPayload, Desa, InfraDesa, SusenasKabupaten, Tier } from './types';
 
 /**
  * Hitung estimasi kebutuhan ideal berbasis data nyata desa.
@@ -234,7 +235,8 @@ export async function analyzeAnggaran(
     ? await resolveKegiatanPerKey(parseRekomendasiKeys(desa), tier)
     : {};
   const kegiatan = [...new Set(Object.values(kegiatanPerKey).flat())];
-  const diagnosis = diagnosaDesa(desa, anggaran, estimasi, tier, kegiatanPerKey);
+  const { susenas, infra } = await ambilDataTambahan(desa.kode_bps);
+  const diagnosis = diagnosaDesa(desa, anggaran, estimasi, tier, kegiatanPerKey, { susenas, infra });
 
   const dasar = {
     anggaran,
@@ -244,7 +246,9 @@ export async function analyzeAnggaran(
     kegiatan,
     rincian_biaya: rincian,
     diagnosis,
-    tahun_data: 'Podes 2025, IDM 2024',
+    susenas,
+    infra,
+    tahun_data: 'Podes 2025, IDM 2024, Susenas 2025',
     podes_tersedia: podesTersedia,
   };
 
@@ -252,7 +256,13 @@ export async function analyzeAnggaran(
   try {
     const cached = await getCachedNarasi(desa.kode_bps, anggaran);
     if (cached) {
-      return { ...dasar, narasi: cached.narasi, sumber_narasi: 'cache' };
+      // Narasi template di cache tetap dilabeli template — UI menyembunyikannya
+      // karena isinya sudah tampil di panel diagnosis.
+      return {
+        ...dasar,
+        narasi: cached.narasi,
+        sumber_narasi: cached.sumber === 'template' ? 'template' : 'cache',
+      };
     }
   } catch (err) {
     console.warn('[analisis] cache read failed:', err);
@@ -270,55 +280,7 @@ export async function analyzeAnggaran(
     };
   }
 
-  // Fetch Susenas data untuk konteks LLM
-  let susenasData: SusenasData | null = null;
-  try {
-    const r101 = desa.kode_bps.substring(0, 2);
-    const r102 = desa.kode_bps.substring(2, 4);
-    const susenasRows = await query<{
-      total_rt: number; khawatir_makan_pct: number | null;
-      tidak_makan_sehat_pct: number | null; sedikit_jenis_makanan_pct: number | null;
-      lewat_waktu_makan_pct: number | null; makan_lebih_sedikit_pct: number | null;
-      kehabisan_makanan_pct: number | null; lapar_tidak_makan_pct: number | null;
-      tidak_makan_seharian_pct: number | null; rata_rumah_milik_sendiri_pct: number | null;
-      rata_lantai_rumah: number | null; air_pdam_pct: number | null; air_sumur_pct: number | null;
-      kekurangan_air_pct: number | null; punya_toilet_pct: number | null; listrik_pln_pct: number | null;
-      rata_umur: number | null; punya_nik_pct: number | null; tidak_sekolah_pct: number | null;
-      sd_pct: number | null; smp_pct: number | null; sma_pct: number | null; buta_huruf_pct: number | null;
-    }>(`SELECT
-      count(*) as total_rt,
-      count(*) FILTER (WHERE r1501 = 1)::float / NULLIF(count(*),0) * 100 as khawatir_makan_pct,
-      count(*) FILTER (WHERE r1502 = 1)::float / NULLIF(count(*),0) * 100 as tidak_makan_sehat_pct,
-      count(*) FILTER (WHERE r1503 = 1)::float / NULLIF(count(*),0) * 100 as sedikit_jenis_makanan_pct,
-      count(*) FILTER (WHERE r1504 = 1)::float / NULLIF(count(*),0) * 100 as lewat_waktu_makan_pct,
-      count(*) FILTER (WHERE r1505 = 1)::float / NULLIF(count(*),0) * 100 as makan_lebih_sedikit_pct,
-      count(*) FILTER (WHERE r1506 = 1)::float / NULLIF(count(*),0) * 100 as kehabisan_makanan_pct,
-      count(*) FILTER (WHERE r1507 = 1)::float / NULLIF(count(*),0) * 100 as lapar_tidak_makan_pct,
-      count(*) FILTER (WHERE r1508 = 1)::float / NULLIF(count(*),0) * 100 as tidak_makan_seharian_pct,
-      count(*) FILTER (WHERE r1602 = 1)::float / NULLIF(count(*),0) * 100 as rata_rumah_milik_sendiri_pct,
-      avg(r1604) as rata_lantai_rumah,
-      count(*) FILTER (WHERE r1610a = 1)::float / NULLIF(count(*),0) * 100 as air_pdam_pct,
-      count(*) FILTER (WHERE r1610a = 2)::float / NULLIF(count(*),0) * 100 as air_sumur_pct,
-      count(*) FILTER (WHERE r1612 = 1)::float / NULLIF(count(*),0) * 100 as kekurangan_air_pct,
-      count(*) FILTER (WHERE r1609a = 1)::float / NULLIF(count(*),0) * 100 as punya_toilet_pct,
-      count(*) FILTER (WHERE r1616 = 1)::float / NULLIF(count(*),0) * 100 as listrik_pln_pct,
-      avg(r407) as rata_umur,
-      count(*) FILTER (WHERE r505 = 1)::float / NULLIF(count(*),0) * 100 as punya_nik_pct,
-      count(*) FILTER (WHERE r611 = 5)::float / NULLIF(count(*),0) * 100 as tidak_sekolah_pct,
-      count(*) FILTER (WHERE r613 IN (1,2,3,4,5,6))::float / NULLIF(count(*),0) * 100 as sd_pct,
-      count(*) FILTER (WHERE r613 IN (7,8,9,10,11,12))::float / NULLIF(count(*),0) * 100 as smp_pct,
-      count(*) FILTER (WHERE r613 IN (13,14,15,16,17))::float / NULLIF(count(*),0) * 100 as sma_pct,
-      count(*) FILTER (WHERE r608 = 5)::float / NULLIF(count(*),0) * 100 as buta_huruf_pct
-    FROM susenas_rt rt
-    LEFT JOIN susenas_ind ind ON rt.psu = ind.psu AND rt.urut = ind.urut
-    WHERE rt.r101 = $1 AND rt.r102 = $2`, [r101, r102]);
-
-    if (susenasRows.length > 0 && Number(susenasRows[0].total_rt) > 0) {
-      susenasData = { tersedia: true, ...susenasRows[0] } as unknown as SusenasData;
-    }
-  } catch (err) {
-    console.warn('[analisis] susenas fetch failed:', err);
-  }
+  const susenasData = susenas?.tersedia ? (susenas as unknown as SusenasData) : null;
 
   // Kolom desa.estimasi_biaya di DB bisa basi (tidak ikut berubah saat
   // rumus diperbaiki). Layar & perhitungan memakai rincianEstimasiBiaya()
@@ -334,4 +296,21 @@ export async function analyzeAnggaran(
   }
 
   return { ...dasar, narasi, sumber_narasi: sumber };
+}
+
+/** Susenas + fasilitas Podes; gagal salah satu → null, analisis tetap jalan. */
+export async function ambilDataTambahan(
+  kodeBps: string,
+): Promise<{ susenas: SusenasKabupaten | null; infra: InfraDesa | null }> {
+  const [susenas, infra] = await Promise.all([
+    ambilSusenas(kodeBps).catch((err) => {
+      console.warn('[analisis] susenas gagal:', err);
+      return null;
+    }),
+    ambilInfra(kodeBps).catch((err) => {
+      console.warn('[analisis] infra gagal:', err);
+      return null;
+    }),
+  ]);
+  return { susenas, infra };
 }

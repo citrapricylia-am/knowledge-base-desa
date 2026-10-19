@@ -1,6 +1,7 @@
-import { ClipboardList } from 'lucide-react';
+import Link from 'next/link';
+import { Calculator, ClipboardList } from 'lucide-react';
 import type { AnalisisPayload } from '@/lib/types';
-import { formatNumber, formatPct, statusIdmColor } from '@/lib/format';
+import { formatNumber, formatPct, statusIdmColor, tierColor, tierLabel } from '@/lib/format';
 import { rupiahRingkas } from '@/lib/diagnosis';
 
 /**
@@ -8,14 +9,13 @@ import { rupiahRingkas } from '@/lib/diagnosis';
  * di mana posisi desa, apa masalah terbesarnya, cukupkah anggarannya,
  * dan ke mana uang pertama sebaiknya pergi.
  */
-export default function RingkasanEksekutif({ analisis }: { analisis: AnalisisPayload }) {
+export default function RingkasanEksekutif({ analisis, kodeBps }: { analisis: AnalisisPayload; kodeBps: string }) {
   const { diagnosis } = analisis;
   const posisi = diagnosis.posisiIdm;
-  const utama = diagnosis.program.find((p) => p.key !== 'monitoring');
-  const kurang = Math.max(0, analisis.estimasi_biaya_ideal - analisis.anggaran);
   const jumlahMasalah = diagnosis.temuan.filter(
-    (t) => t.jenis === 'masalah' && (t.tingkat === 'kritis' || t.tingkat === 'tinggi'),
+    (t) => t.jenis === 'masalah' && !t.id.startsWith('pilar_') && (t.tingkat === 'kritis' || t.tingkat === 'tinggi'),
   ).length;
+  const lebarCakupan = Math.min(100, Math.max(0, analisis.coverage_pct));
 
   const tiles: { label: string; nilai: React.ReactNode; ket: string }[] = [
     {
@@ -35,12 +35,12 @@ export default function RingkasanEksekutif({ analisis }: { analisis: AnalisisPay
     {
       label: 'Cakupan anggaran',
       nilai: formatPct(analisis.coverage_pct),
-      ket: kurang > 0 ? `Kurang ${rupiahRingkas(kurang)}` : 'Kebutuhan ideal terpenuhi',
+      ket: `${rupiahRingkas(analisis.anggaran)} dari ${rupiahRingkas(analisis.estimasi_biaya_ideal)}`,
     },
     {
       label: 'Masalah serius',
       nilai: String(jumlahMasalah),
-      ket: utama ? `Prioritas #1: ${utama.bidang}` : 'Tingkat kritis & tinggi',
+      ket: 'temuan tingkat kritis & tinggi',
     },
   ];
 
@@ -57,8 +57,26 @@ export default function RingkasanEksekutif({ analisis }: { analisis: AnalisisPay
             <div className="text-[11px] uppercase tracking-wide text-white/40">{t.label}</div>
             <div className="text-xl font-bold text-white tabular-nums leading-tight">{t.nilai}</div>
             <div className="text-xs text-white/45 leading-snug">{t.ket}</div>
+            {t.label === 'Cakupan anggaran' && (
+              <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                <div className="h-full rounded-full bg-white" style={{ width: `${lebarCakupan}%` }} />
+              </div>
+            )}
           </div>
         ))}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className={`px-2.5 py-1 rounded-md border text-xs ${tierColor(analisis.tier)}`}>
+          {tierLabel(analisis.tier)}
+        </span>
+        <Link
+          href={`/hasil/anggaran?kode_bps=${kodeBps}&anggaran=${analisis.anggaran}`}
+          className="print-hide inline-flex items-center gap-1.5 text-xs text-amber-300/90 hover:text-amber-200 transition-colors"
+        >
+          <Calculator className="w-3.5 h-3.5" />
+          Rincian perhitungan & simulasi anggaran →
+        </Link>
       </div>
 
       <ol className="space-y-2.5">
