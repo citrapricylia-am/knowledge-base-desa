@@ -162,3 +162,39 @@ export function translateRekomendasi(val: string | null | undefined): string {
     .map((v) => REKOMENDASI_MAP[v.trim()] ?? v.trim())
     .join(', ');
 }
+
+export function tingkatLabel(tingkat?: string | null): string {
+  switch (tingkat) {
+    case 'kritis': return 'Kritis';
+    case 'tinggi': return 'Tinggi';
+    case 'sedang': return 'Sedang';
+    case 'baik': return 'Baik';
+    default: return tingkat ?? '—';
+  }
+}
+
+export function tingkatColor(tingkat?: string | null): string {
+  switch (tingkat) {
+    case 'kritis':
+      return 'bg-rose-500/10 text-rose-300 border-rose-500/25';
+    case 'tinggi':
+      return 'bg-orange-500/10 text-orange-300 border-orange-500/25';
+    case 'sedang':
+      return 'bg-amber-500/10 text-amber-300 border-amber-500/25';
+    case 'baik':
+      return 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25';
+    default:
+      return 'bg-white/5 text-white/50 border-white/10';
+  }
+}
+
+export function urgensiColor(urgensi?: string | null): string {
+  switch (urgensi) {
+    case 'mendesak':
+      return 'bg-rose-500/10 text-rose-300 border-rose-500/25';
+    case 'penting':
+      return 'bg-amber-500/10 text-amber-300 border-amber-500/25';
+    default:
+      return 'bg-white/5 text-white/55 border-white/10';
+  }
+}

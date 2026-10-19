@@ -1,6 +1,8 @@
 import { query } from './db';
 import { desaToLlmData, generateNarasi, getTier, type SusenasData } from './llm';
 import { getCachedNarasi, setCachedNarasi } from './cache';
+import { diagnosaDesa } from './diagnosis';
+import { labelIdm } from './format';
 import type { AnalisisPayload, Desa, Tier } from './types';
 
 /**
@@ -69,12 +71,16 @@ export function rincianEstimasiBiaya(desa: Desa): RincianBiaya {
 
   const subtotal = komponen.reduce((a, k) => a + k.nilai, 0);
 
-  const idm = Number(desa.idm ?? 0.7);
+  // Ambang pakai labelIdm() (ambang resmi IDM) supaya label multiplier
+  // tidak bertentangan dengan badge status di layar. IDM kosong → 0,7
+  // (perilaku lama, setara Berkembang).
   let idmMultiplier = 1;
   let idmLabel = 'Maju/Mandiri';
-  if (idm < 0.49) { idmMultiplier = 1.8; idmLabel = 'Sangat tertinggal'; }
-  else if (idm < 0.6) { idmMultiplier = 1.5; idmLabel = 'Tertinggal'; }
-  else if (idm < 0.71) { idmMultiplier = 1.2; idmLabel = 'Berkembang'; }
+  switch (labelIdm(desa.idm ?? 0.7)) {
+    case 'SANGAT TERTINGGAL': idmMultiplier = 1.8; idmLabel = 'Sangat tertinggal'; break;
+    case 'TERTINGGAL': idmMultiplier = 1.5; idmLabel = 'Tertinggal'; break;
+    case 'BERKEMBANG': idmMultiplier = 1.2; idmLabel = 'Berkembang'; break;
+  }
 
   let podesMultiplier = 1;
   let podesLabel = 'Potensi tinggi';
@@ -163,32 +169,45 @@ export function parseRekomendasiKeys(desa: Desa): string[] {
   return [];
 }
 
-export async function resolveKegiatan(
+/** Kegiatan per kunci rekomendasi, urutan kunci mengikuti data desa. */
+export async function resolveKegiatanPerKey(
   rekomendasiKeys: string[],
   tier: Tier,
-): Promise<string[]> {
-  if (!rekomendasiKeys.length) return [];
+): Promise<Record<string, string[]>> {
+  if (!rekomendasiKeys.length) return {};
 
+  const out: Record<string, string[]> = {};
   try {
-    const rows = await query<{ kegiatan: string }>(
-      `SELECT kegiatan FROM kegiatan_config
+    const rows = await query<{ rekomendasi_key: string; kegiatan: string }>(
+      `SELECT rekomendasi_key, kegiatan FROM kegiatan_config
        WHERE rekomendasi_key = ANY($1::text[]) AND tier = $2
        ORDER BY rekomendasi_key`,
       [rekomendasiKeys, tier],
     );
     if (rows.length) {
-      return [...new Set(rows.map((r) => r.kegiatan))];
+      for (const key of rekomendasiKeys) {
+        const items = [...new Set(rows.filter((r) => r.rekomendasi_key === key).map((r) => r.kegiatan))];
+        if (items.length) out[key] = items;
+      }
+      return out;
     }
   } catch (err) {
     console.warn('[analisis] kegiatan_config query failed, pakai fallback:', err);
   }
 
-  const out: string[] = [];
   for (const key of rekomendasiKeys) {
     const items = FALLBACK_KEGIATAN[key]?.[tier];
-    if (items) out.push(...items);
+    if (items) out[key] = [...items];
   }
-  return [...new Set(out)];
+  return out;
+}
+
+export async function resolveKegiatan(
+  rekomendasiKeys: string[],
+  tier: Tier,
+): Promise<string[]> {
+  const perKey = await resolveKegiatanPerKey(rekomendasiKeys, tier);
+  return [...new Set(Object.values(perKey).flat())];
 }
 
 export function toPublicDesa(desa: Desa) {
@@ -211,50 +230,43 @@ export async function analyzeAnggaran(
   const tier = getTier(coveragePct);
   const podesTersedia = desa.klasifikasi_podes != null;
 
+  const kegiatanPerKey = podesTersedia
+    ? await resolveKegiatanPerKey(parseRekomendasiKeys(desa), tier)
+    : {};
+  const kegiatan = [...new Set(Object.values(kegiatanPerKey).flat())];
+  const diagnosis = diagnosaDesa(desa, anggaran, estimasi, tier, kegiatanPerKey);
+
+  const dasar = {
+    anggaran,
+    estimasi_biaya_ideal: estimasi,
+    coverage_pct: Math.round(coveragePct * 100) / 100,
+    tier,
+    kegiatan,
+    rincian_biaya: rincian,
+    diagnosis,
+    tahun_data: 'Podes 2025, IDM 2024',
+    podes_tersedia: podesTersedia,
+  };
+
   // Cek cache dulu
   try {
     const cached = await getCachedNarasi(desa.kode_bps, anggaran);
     if (cached) {
-      const keys = parseRekomendasiKeys(desa);
-      const kegiatan = podesTersedia
-        ? await resolveKegiatan(keys, tier)
-        : [];
-      return {
-        anggaran,
-        estimasi_biaya_ideal: estimasi,
-        coverage_pct: Math.round(coveragePct * 100) / 100,
-        tier,
-        kegiatan,
-        rincian_biaya: rincian,
-        narasi: cached.narasi,
-        sumber_narasi: 'cache',
-        tahun_data: 'Podes 2025, IDM 2024',
-        podes_tersedia: podesTersedia,
-      };
+      return { ...dasar, narasi: cached.narasi, sumber_narasi: 'cache' };
     }
   } catch (err) {
     console.warn('[analisis] cache read failed:', err);
   }
 
-  const keys = parseRekomendasiKeys(desa);
-  const kegiatan = podesTersedia ? await resolveKegiatan(keys, tier) : [];
-
-  // Mode cepat: kembalikan angka + kegiatan tanpa menunggu LLM (20-35 detik).
+  // Mode cepat: kembalikan angka + diagnosis tanpa menunggu LLM (20-35 detik).
   // Halaman hasil memakai ini untuk tampil <1 detik, lalu meminta narasi
   // via /api/narasi di belakang layar. JANGAN tulis cache di sini —
   // narasi masih kosong, nanti menimpa narasi asli.
   if (opsi.tanpaLlm) {
     return {
-      anggaran,
-      estimasi_biaya_ideal: estimasi,
-      coverage_pct: Math.round(coveragePct * 100) / 100,
-      tier,
-      kegiatan,
-      rincian_biaya: rincian,
+      ...dasar,
       narasi: { konteks: '', posisi_anggaran: '', rekomendasi: [], disclaimer: '' },
       sumber_narasi: 'pending',
-      tahun_data: 'Podes 2025, IDM 2024',
-      podes_tersedia: podesTersedia,
     };
   }
 
@@ -313,7 +325,7 @@ export async function analyzeAnggaran(
   // sebagai sumber tunggal — timpa di sini supaya narasi AI tidak
   // menyebut angka yang berbeda dari yang dilihat pengguna.
   const desaData = { ...desaToLlmData(desa), estimasi_biaya: estimasi };
-  const { narasi, sumber } = await generateNarasi(desaData, anggaran, kegiatan, susenasData);
+  const { narasi, sumber } = await generateNarasi(desaData, anggaran, kegiatan, susenasData, diagnosis);
 
   try {
     await setCachedNarasi(desa.kode_bps, anggaran, narasi, sumber);
@@ -321,16 +333,5 @@ export async function analyzeAnggaran(
     console.warn('[analisis] cache write failed:', err);
   }
 
-  return {
-    anggaran,
-    estimasi_biaya_ideal: estimasi,
-    coverage_pct: Math.round(coveragePct * 100) / 100,
-    tier,
-    kegiatan,
-    rincian_biaya: rincian,
-    narasi,
-    sumber_narasi: sumber,
-    tahun_data: 'Podes 2025, IDM 2024',
-    podes_tersedia: podesTersedia,
-  };
+  return { ...dasar, narasi, sumber_narasi: sumber };
 }

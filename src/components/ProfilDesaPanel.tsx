@@ -134,7 +134,7 @@ function InfoTip({ text }: { text: string }) {
   return (
     <span className="relative inline-flex group/tip">
       <Info className="w-3 h-3 text-white/20 cursor-help group-hover/tip:text-white/50 transition-colors" />
-      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900 border border-white/10 text-[11px] text-white/70 leading-snug whitespace-normal w-48 opacity-0 group-hover/tip:opacity-100 transition-opacity z-50 shadow-xl">
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900 border border-white/10 text-[11px] text-white/70 leading-snug whitespace-normal w-48 hidden group-hover/tip:block z-50 shadow-xl">
         {text}
       </span>
     </span>

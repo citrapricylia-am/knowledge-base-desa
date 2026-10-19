@@ -9,7 +9,8 @@ export function buildCacheHash(kodeBps: string, anggaran: number): string {
   // VERSI dinaikkan tiap kali format/prompt narasi berubah — baris lama
   // di narasi_cache otomatis tidak kena dan narasi dibuat ulang.
   // v2: angka desimal pakai koma (id-ID), bukan titik.
-  const VERSI = 'v2';
+  // v3: rekomendasi per bidang program (judul = bidang), 4 poin, berbasis diagnosis.
+  const VERSI = 'v3';
   return createHash('sha256').update(`${kodeBps}:${bucket}:${VERSI}`).digest('hex');
 }
 

@@ -1,6 +1,7 @@
 import { queryOne } from '@/lib/db';
 import { desaToLlmData, buildUserPrompt, getTier } from '@/lib/llm';
-import { rincianEstimasiBiaya, parseRekomendasiKeys, resolveKegiatan } from '@/lib/analisis';
+import { rincianEstimasiBiaya, parseRekomendasiKeys, resolveKegiatanPerKey } from '@/lib/analisis';
+import { diagnosaDesa } from '@/lib/diagnosis';
 import { getCachedNarasi } from '@/lib/cache';
 import type { Desa } from '@/lib/types';
 import { NextResponse } from 'next/server';
@@ -61,9 +62,13 @@ export async function POST(request: Request) {
     // jawaban chat tidak pernah bertentangan dengan angka di layar.
     const rincian = rincianEstimasiBiaya(desa);
     const tier = getTier(rincian.total > 0 ? (anggaran / rincian.total) * 100 : 0);
-    const kegiatan = desa.klasifikasi_podes != null
-      ? await resolveKegiatan(parseRekomendasiKeys(desa), tier)
-      : [];
+    const kegiatanPerKey = desa.klasifikasi_podes != null
+      ? await resolveKegiatanPerKey(parseRekomendasiKeys(desa), tier)
+      : {};
+    const kegiatan = [...new Set(Object.values(kegiatanPerKey).flat())];
+    // Diagnosis yang sama dengan layar: chat bisa menjawab "kenapa air
+    // bersih prioritas #1?" atau "berapa alokasi pendidikan?" dengan angka yang cocok.
+    const diagnosis = diagnosaDesa(desa, anggaran, rincian.total, tier, kegiatanPerKey);
 
     let konteks = buildUserPrompt(
       // estimasi_biaya dari kolom DB bisa basi; layar memakai
@@ -73,6 +78,7 @@ export async function POST(request: Request) {
       anggaran,
       kegiatan,
       null,
+      diagnosis,
     );
 
     // Sertakan narasi yang sudah dibaca pengguna (kalau ada di cache),
